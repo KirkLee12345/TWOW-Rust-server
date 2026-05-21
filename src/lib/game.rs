@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
 use serde::de::Unexpected::Option;
 use crate::lib::sign::send_yzm;
@@ -6,9 +7,9 @@ use crate::lib::users::{is_email_exist, is_user_exist, load_email_yzm, load_user
 use sha2::{Sha256, Digest};
 use crate::lib::server::{log, PROTOCOL_VERSION};
 
-static GLOBAL_MAP: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
-fn get_user_room() -> &'static Mutex<HashMap<String, String>> {
-    GLOBAL_MAP.get_or_init(|| Mutex::new(HashMap::new()))
+static INDEX_SOCKET_ROOM: OnceLock<Mutex<Vec<(String, TcpStream, String)>>> = OnceLock::new();
+fn get_online_users() -> &'static Mutex<Vec<(String, TcpStream, String)>> {
+    INDEX_SOCKET_ROOM.get_or_init(|| Mutex::new(vec![]))
 }
 
 
@@ -20,7 +21,7 @@ fn hash(s: &str) -> String {
     format!("{:x}", result)
 }
 
-pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &mut String) -> String {
+pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &mut String, client: TcpStream) -> String {
     let data: Vec<&str> = data.split(" ").filter(|s| !s.is_empty()).collect();
 
     match data[0] {
@@ -81,14 +82,14 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                         Ok(n) => {
                             match n {
                                 PROTOCOL_VERSION => {
-                                    for (k, _) in get_user_room().lock().unwrap().iter() {
+                                    for (k, _, _) in get_online_users().lock().unwrap().iter() {
                                         if *k == data[2].to_string() {
                                             return String::from("重复登陆!");
                                         }
                                     }
                                     if is_user_exist(data[2]).unwrap() {
                                         if load_user_info(data[2]).unwrap().unwrap().password_hash == hash(data[3]) {
-                                            get_user_room().lock().unwrap().insert(data[2].to_string(), "None".to_string());
+                                            get_online_users().lock().unwrap().push((data[2].to_string(), client, "".to_string()));
                                             log(format!("[{thread_index}] {} 登陆成功", data[2]));
                                             *is_login = true;
                                             *zh = data[2].to_string();
@@ -122,7 +123,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
         "selfinfo" => {
             if !*is_login { return String::from("tip [E300]参数错误(未登录)"); }
             let money = load_user_data(zh).unwrap().unwrap().money;
-            let online_players = get_user_room().lock().unwrap().len();
+            let online_players = get_online_users().lock().unwrap().len();
             return String::from(format!("selfinfo {} {money} {online_players}", *zh));
         }
 
@@ -137,7 +138,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             save_user_data(zh, &user_data).expect("内部错误：用户数据保存失败");
                             log(format!("[{thread_index}] {zh} 测试增加10金币"));
                             let money = load_user_data(zh).unwrap().unwrap().money;
-                            let online_players = get_user_room().lock().unwrap().len();
+                            let online_players = get_online_users().lock().unwrap().len();
                             return String::from(format!("selfinfo {} {money} {online_players}", *zh));
                         }
                         _ => return String::from("tip [E911]参数错误(参数数量不对)")

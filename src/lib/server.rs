@@ -89,7 +89,7 @@ fn handle_connection(stream: TcpStream, thread_index: usize) {
                 let message = String::from_utf8_lossy(&buffer[..n]).to_string();
                 log(format!("[{thread_index}] 收到数据: {message}"));
                 // 构造响应
-                let response = handle_data(message, thread_index, &mut is_login, &mut zh);
+                let response = handle_data(message, thread_index, &mut is_login, &mut zh, stream.try_clone().expect(format!("[{thread_index}] 克隆 stream 失败").as_str()));
                 log(format!("[{thread_index}] 发送数据: {response}"));
                 write_stream.write_all(response.as_bytes()).expect("发送错误");
             }
