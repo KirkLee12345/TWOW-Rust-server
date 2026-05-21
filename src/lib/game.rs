@@ -49,7 +49,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             get_ema_yzm().lock().unwrap().push((data[2].to_string(), yzm));
                             return String::from("sand yzm sucess");
                         }
-                        _ => return String::from("tip [E111]无法解析的数据")
+                        _ => return String::from("tip [E101]无法解析的数据")
                     }
                 }
                 6 => {
@@ -73,10 +73,10 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             }
                             return String::from("验证码错误!");
                         }
-                        _ => return String::from("tip [E112]无法解析的数据")
+                        _ => return String::from("tip [E102]无法解析的数据")
                     }
                 }
-                _ => return String::from("tip [E101]参数错误(参数数量不对)")
+                _ => return String::from("tip [E103]参数错误(参数数量不对)")
             }
         }
 
@@ -109,10 +109,10 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                                 _ => return String::from(format!("loginfail {PROTOCOL_VERSION}")),
                             }
                         }
-                        Err(e) => return String::from("tip [E211]参数错误(不可能的参数)"),
+                        Err(e) => return String::from("tip [E104]参数错误(不可能的参数)"),
                     }
                 }
-                _ => return String::from("tip [E201]参数错误(参数数量不对)")
+                _ => return String::from("tip [E105]参数错误(参数数量不对)")
             }
         }
 
@@ -126,14 +126,14 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
         }
 
         "selfinfo" => {
-            if !*is_login { return String::from("tip [E300]参数错误(未登录)"); }
+            if !*is_login { return String::from("tip [E106]参数错误(未登录)"); }
             let money = load_user_data(zh).unwrap().unwrap().money;
             let online_players = get_online_users().lock().unwrap().len();
             return String::from(format!("selfinfo {} {money} {online_players}", *zh));
         }
 
         "test" => {
-            if !*is_login { return String::from("tip [E900]参数错误(未登录)"); }
+            if !*is_login { return String::from("tip [E901]参数错误(未登录)"); }
             match data.len() {
                 2 => {
                     match data[1] {
@@ -146,13 +146,13 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             let online_players = get_online_users().lock().unwrap().len();
                             return String::from(format!("selfinfo {} {money} {online_players}", *zh));
                         }
-                        _ => return String::from("tip [E911]参数错误(参数数量不对)")
+                        _ => return String::from("tip [E902]参数错误(参数数量不对)")
                     }
                 }
-                _ => return String::from("tip [E901]参数错误(参数数量不对)")
+                _ => return String::from("tip [E903]参数错误(参数数量不对)")
             }
         }
-        
+
 
 
 
