@@ -9,7 +9,6 @@ use std::thread;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::lib::game;
 use game::handle_data;
-use crate::lib::users::clear_email_yzm;
 
 const VERSION: &str = "1.2.3";
 pub(crate) const PROTOCOL_VERSION: i32 = 3;
@@ -53,7 +52,6 @@ impl Server {
         let logs_dir = std::path::Path::new("logs");
         if !logs_dir.exists() {fs::create_dir_all(logs_dir).expect("错误: 无法创建 logs 目录。");}
         fs::read_to_string("email.key").expect("错误: 无法读取 email.key 文件，请确保该文件存在于程序运行目录。");
-        clear_email_yzm().expect("错误: 重置验证码数据库失败。");
 
         let listener = TcpListener::bind(format!("{}:{}", self.host, self.port)).unwrap();
         log(format!("服务端启动完成，版本号：{}，协议版本：{}，监听地址：{}:{}", self.version, self.protocol_version, self.host, self.port));

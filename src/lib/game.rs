@@ -3,15 +3,19 @@ use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
 use serde::de::Unexpected::Option;
 use crate::lib::sign::send_yzm;
-use crate::lib::users::{is_email_exist, is_user_exist, load_email_yzm, load_user_data, load_user_info, save_email_yzm, save_user_data, save_user_info, UserData, UserInfo};
+use crate::lib::users::{is_email_exist, is_user_exist, load_user_data, load_user_info, save_user_data, save_user_info, UserData, UserInfo};
 use sha2::{Sha256, Digest};
 use crate::lib::server::{log, PROTOCOL_VERSION};
 
-static INDEX_SOCKET_ROOM: OnceLock<Mutex<Vec<(String, TcpStream, String)>>> = OnceLock::new();
-fn get_online_users() -> &'static Mutex<Vec<(String, TcpStream, String)>> {
-    INDEX_SOCKET_ROOM.get_or_init(|| Mutex::new(vec![]))
-}
+static USERNAME_SOCKET_ROOM: OnceLock<Mutex<Vec<(String, TcpStream, String)>>> = OnceLock::new();
+static EMA_YZM: OnceLock<Mutex<Vec<(String, String)>>> = OnceLock::new();
 
+fn get_online_users() -> &'static Mutex<Vec<(String, TcpStream, String)>> {
+    USERNAME_SOCKET_ROOM.get_or_init(|| Mutex::new(vec![]))
+}
+fn get_ema_yzm() -> &'static Mutex<Vec<(String, String)>> {
+    EMA_YZM.get_or_init(|| Mutex::new(vec![]))
+}
 
 
 fn hash(s: &str) -> String {
@@ -42,7 +46,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                         }
                         "ema" => {
                             let yzm = send_yzm(thread_index, data[2].to_string());
-                            save_email_yzm(data[2], yzm.as_str()).expect("内部错误：验证码保存失败");
+                            get_ema_yzm().lock().unwrap().push((data[2].to_string(), yzm));
                             return String::from("sand yzm sucess");
                         }
                         _ => return String::from("tip [E111]无法解析的数据")
@@ -52,21 +56,22 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                     match data[1] {
                         "up" => {
                             if is_email_exist(data[4]).unwrap() { return String::from("此邮箱已被绑定!"); }
-                            if load_email_yzm(data[4]).unwrap() == Some(data[5].to_string()) {
-                                let user_info = UserInfo {
-                                    password_hash: hash(data[3]),
-                                    email: data[4].to_string(),
-                                };
-                                save_user_info(data[2], &user_info).expect("内部错误：用户信息保存失败");
-                                let user_data = UserData {
-                                    money: 0,
-                                };
-                                save_user_data(data[2], &user_data).expect("内部错误：用户数据保存失败");
-                                log(format!("[{thread_index}] {} 使用邮箱 {} 注册成功", data[2], data[4]));
-                                return String::from("注册成功!");
-                            } else {
-                                return String::from("验证码错误!");
+                            for (k, v) in get_ema_yzm().lock().unwrap().iter() {
+                                if k == data[2] && v == data[5] {
+                                    let user_info = UserInfo {
+                                        password_hash: hash(data[3]),
+                                        email: data[4].to_string(),
+                                    };
+                                    save_user_info(data[2], &user_info).expect("内部错误：用户信息保存失败");
+                                    let user_data = UserData {
+                                        money: 0,
+                                    };
+                                    save_user_data(data[2], &user_data).expect("内部错误：用户数据保存失败");
+                                    log(format!("[{thread_index}] {} 使用邮箱 {} 注册成功", data[2], data[4]));
+                                    return String::from("注册成功!");
+                                }
                             }
+                            return String::from("验证码错误!");
                         }
                         _ => return String::from("tip [E112]无法解析的数据")
                     }
@@ -147,7 +152,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                 _ => return String::from("tip [E901]参数错误(参数数量不对)")
             }
         }
-
+        
 
 
 

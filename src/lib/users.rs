@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 const USER_INFO_DB: &str = "user_info";
 const USER_DATA_DB: &str = "user_data";
-const EMAIL_YZM_DB: &str = "email_yzm";
 
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -71,30 +70,4 @@ pub fn load_user_data(username: &str) -> anyhow::Result<Option<UserData>> {
         }
         None => Ok(None),
     }
-}
-
-pub fn save_email_yzm(email: &str, yzm: &str) -> anyhow::Result<()> {
-    let db = sled::open(EMAIL_YZM_DB)?;
-    let key = email.as_bytes();
-    let value = yzm.as_bytes();
-    db.insert(key, value)?;
-    Ok(())
-}
-
-pub fn load_email_yzm(email: &str) -> anyhow::Result<Option<String>> {
-    let db = sled::open(EMAIL_YZM_DB)?;
-    let key = email.as_bytes();
-    match db.get(key)? {
-        Some(bytes) => {
-            let yzm = String::from_utf8(bytes.to_vec())?;
-            Ok(Some(yzm))
-        }
-        None => Ok(None),
-    }
-}
-
-pub fn clear_email_yzm() -> anyhow::Result<()> {
-    let db = sled::open(EMAIL_YZM_DB)?;
-    db.clear()?;
-    Ok(())
 }
