@@ -1,93 +1,28 @@
-use std::collections::HashMap;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
 use std::thread;
-use serde::de::Unexpected::Option;
 use crate::lib::sign::send_yzm;
 use crate::lib::users::{is_email_exist, is_user_exist, load_user_data, load_user_info, save_user_data, save_user_info, UserData, UserInfo};
 use sha2::{Sha256, Digest};
 use crate::lib::server::{log, PROTOCOL_VERSION};
 use std::time::Duration;
+use crate::lib::room;
 
-#[derive(Clone, Copy)]
-enum Card {
-    Empty,
-    Attack(i8),
-    Shield(i8),
-    AddEnergy(i8),
-    ConsumeEnergy(i8),
-    Skill(i8),
-}
+pub(crate) static USERNAME_SOCKET_ROOM: OnceLock<Mutex<Vec<(String, TcpStream)>>> = OnceLock::new();
+pub(crate) static EMA_YZM: OnceLock<Mutex<Vec<(String, String)>>> = OnceLock::new();
 
-struct Player {
-    used: bool,
-    energy: i32,
-    hand_cards: [Card; 8],
-    passive_cards: [Card; 2],
-    out_cards: [Card; 3],
-}
 
-struct Room {
-    name: String,
-    belongs_to: String,
-    guest: String,
-    now: usize,
-    player1: Player,
-    player2: Player,
-    last_card: Card,
-    all_cards: Vec<Card>,
-}
-
-impl Default for Card {
-    fn default() -> Self {
-        Card::Empty
-    }
-}
-
-impl Default for Player {
-    fn default() -> Self {
-        Player {
-            used: false,
-            energy: 0,
-            hand_cards: [Card::Empty; 8],
-            passive_cards: [Card::Empty; 2],
-            out_cards: [Card::Empty; 3],
-        }
-    }
-}
-
-impl Default for Room {
-    fn default() -> Self {
-        Room {
-            name: "".to_string(),
-            belongs_to: "".to_string(),
-            guest: "".to_string(),
-            now: 0,
-            player1: Player::default(),
-            player2: Player::default(),
-            last_card: Card::Empty,
-            all_cards: vec![],
-        }
-    }
-}
-
-static USERNAME_SOCKET_ROOM: OnceLock<Mutex<Vec<(String, TcpStream)>>> = OnceLock::new();
-static EMA_YZM: OnceLock<Mutex<Vec<(String, String)>>> = OnceLock::new();
-static ROOMS: OnceLock<Mutex<Vec<Room>>> = OnceLock::new();
-
-fn get_online_users() -> &'static Mutex<Vec<(String, TcpStream)>> {
+pub(crate) fn get_online_users() -> &'static Mutex<Vec<(String, TcpStream)>> {
     USERNAME_SOCKET_ROOM.get_or_init(|| Mutex::new(vec![]))
 }
 fn get_ema_yzm() -> &'static Mutex<Vec<(String, String)>> {
     EMA_YZM.get_or_init(|| Mutex::new(vec![]))
 }
-fn get_rooms() -> &'static Mutex<Vec<Room>> {
-    ROOMS.get_or_init(|| Mutex::new(vec![]))
-}
+
 
 fn delete_room_by_belongs(user: &String) {
-    let mut rooms = get_rooms().lock().unwrap();
+    let mut rooms = room::get_rooms().lock().unwrap();
     if let Some(pos) = rooms.iter().position(|r| r.name == *user) {
         rooms.remove(pos);
     }
@@ -235,7 +170,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                 3 => {
                     match data[1] {
                         "create" => {
-                            for k in get_rooms().lock().unwrap().iter() {
+                            for k in room::get_rooms().lock().unwrap().iter() {
                                 if k.belongs_to == *zh || k.guest == *zh {
                                     return String::from("tip [E108]参数错误(已经在房间里) ");
                                 }
@@ -247,17 +182,17 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             if user_data.money < 100 { return String::from("tip [E110]参数错误(金币不足) "); }
                             user_data.money -= 100;
                             save_user_data(zh, &user_data).expect("内部错误：用户数据保存失败");
-                            let mut room = Room::default();
+                            let mut room = room::Room::default();
                             room.name = data[2].to_string();
                             room.belongs_to = zh.to_string();
-                            get_rooms().lock().unwrap().push(room);
+                            room::get_rooms().lock().unwrap().push(room);
                             log(format!("[{thread_index}] {zh} 创建了房间 {}", data[2]));
                             return String::from(format!("CreateRoomSucess {} ", data[2]));
                         }
                         "join" => {
-                            for k in get_rooms().lock().unwrap().iter_mut() {
+                            for k in room::get_rooms().lock().unwrap().iter_mut() {
                                 if k.belongs_to == *zh || k.guest == *zh {
-                                    return String::from("tip [E115]参数错误(已经在房间里) ");
+                                    return String::from("tip [E111]参数错误(已经在房间里) ");
                                 }
                                 if k.name == data[2] {
                                     if k.guest == "" {
@@ -273,20 +208,20 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                                         }
                                         return String::from(format!("game start {} ", k.belongs_to));
                                     } else {
-                                        return String::from("tip [E116]参数错误(房间已满) ");
+                                        return String::from("tip [E112]参数错误(房间已满) ");
                                     }
                                 }
                             }
-                            return String::from("tip [E117]参数错误(房间不存在) ");
+                            return String::from("tip [E113]参数错误(房间不存在) ");
                         }
-                        _ => return String::from("tip [E111]参数错误(无法解析的数据) ")
+                        _ => return String::from("tip [E114]参数错误(无法解析的数据) ")
                     }
                 }
                 2 => {
                     match data[1] {
                         "r" => {
-                            let mut r = String::from(format!("nowrooms {} ", get_rooms().lock().unwrap().len()));
-                            for k in get_rooms().lock().unwrap().iter() {
+                            let mut r = String::from(format!("nowrooms {} ", room::get_rooms().lock().unwrap().len()));
+                            for k in room::get_rooms().lock().unwrap().iter() {
                                 r.push_str(k.name.as_str());
                                 if k.guest == "" {
                                     r.push_str("┄(1/2)###");
@@ -300,7 +235,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             let mut flag = false;
                             let mut room_other = String::from("");
                             let mut room_name = String::from("");
-                            for k in get_rooms().lock().unwrap().iter_mut() {
+                            for k in room::get_rooms().lock().unwrap().iter_mut() {
                                 if k.belongs_to == *zh {
                                     flag = true;
                                     room_other = k.guest.clone();
@@ -339,17 +274,40 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                                     delete_room_by_belongs(&room_other);
                                     return String::from("tip 已退出房间 ");
                                 } else {
-                                    return String::from("tip [E112]参数错误(未加入任何房间) ");
+                                    return String::from("tip [E115]参数错误(未加入任何房间) ");
                                 }
                             }
                         }
-                        _ => return String::from("tip [E113]参数错误(无法解析的数据) ")
+                        _ => return String::from("tip [E116]参数错误(无法解析的数据) ")
                     }
                 }
-                _ => return String::from("tip [E114]参数错误(参数数量不对) ")
+                _ => return String::from("tip [E117]参数错误(参数数量不对) ")
             }
         }
 
+        "game" => {
+            if !*is_login { return String::from("tip [E118]参数错误(未登录) "); }
+            if !room::check_is_in_room_by_user(zh) { return String::from("tip [E119]参数错误(未加入任何房间) "); }
+
+            match data[1] {
+                "chat" => {
+                    if data.len() < 3 { return String::from("tip [E120]参数错误(参数数量不对) ");}
+                    let mut r = "".to_string();
+                    for i in 2..data.len() {
+                        r.push_str(data[i]);
+                        r.push(' ');
+                    }
+                    room::get_other_client_by_user(zh).unwrap().write_all(format!("game log {zh}:{r}").as_bytes()).expect("内部错误：发送数据失败");
+                    log(format!("[{thread_index}] {zh} 在房间 {} 发送了消息 {r}", room::get_room_name_by_user(zh)));
+                    return String::from(format!("game log {zh}:{r}"));
+                }
+                "start" => {
+                    room::room_start(&room::get_room_name_by_user(zh));
+                    return String::from("null");
+                }
+                "nowinfo" => {
+                    return room::room_refresh(zh);
+                }
 
 
 
@@ -361,7 +319,22 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
 
 
 
-        _ => return String::from("tip [E001]无法解析的数据")
+
+
+
+
+
+
+
+
+
+
+
+                _ => return String::from("tip [E   ]参数错误(无法解析的数据) ")
+            }
+        }
+
+        _ => return String::from("tip [E   ]无法解析的数据")
     }
 
     unreachable!()
