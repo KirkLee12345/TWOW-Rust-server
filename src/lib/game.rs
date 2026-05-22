@@ -2,11 +2,13 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
+use std::thread;
 use serde::de::Unexpected::Option;
 use crate::lib::sign::send_yzm;
 use crate::lib::users::{is_email_exist, is_user_exist, load_user_data, load_user_info, save_user_data, save_user_info, UserData, UserInfo};
 use sha2::{Sha256, Digest};
 use crate::lib::server::{log, PROTOCOL_VERSION};
+use std::time::Duration;
 
 #[derive(Clone, Copy)]
 enum Card {
@@ -121,7 +123,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                         "ema" => {
                             let yzm = send_yzm(thread_index, data[2].to_string());
                             get_ema_yzm().lock().unwrap().push((data[2].to_string(), yzm));
-                            return String::from("sand yzm sucess ");
+                            return String::from("sand yzm sucess");
                         }
                         _ => return String::from("tip [E101]无法解析的数据 ")
                     }
@@ -131,7 +133,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                         "up" => {
                             if is_email_exist(data[4]).unwrap() { return String::from("此邮箱已被绑定!"); }
                             for (k, v) in get_ema_yzm().lock().unwrap().iter() {
-                                if k == data[2] && v == data[5] {
+                                if k == data[4] && v == data[5] {
                                     let user_info = UserInfo {
                                         password_hash: hash(data[3]),
                                         email: data[4].to_string(),
@@ -248,12 +250,34 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             let mut room = Room::default();
                             room.name = data[2].to_string();
                             room.belongs_to = zh.to_string();
-                            get_rooms().lock().unwrap().push(Room::default());
+                            get_rooms().lock().unwrap().push(room);
                             log(format!("[{thread_index}] {zh} 创建了房间 {}", data[2]));
                             return String::from(format!("CreateRoomSucess {} ", data[2]));
                         }
                         "join" => {
-                            todo!("加入房间太麻烦了还要准备开始游戏还是先放着吧")
+                            for k in get_rooms().lock().unwrap().iter_mut() {
+                                if k.belongs_to == *zh || k.guest == *zh {
+                                    return String::from("tip [E115]参数错误(已经在房间里) ");
+                                }
+                                if k.name == data[2] {
+                                    if k.guest == "" {
+                                        k.guest = zh.clone();
+                                        log(format!("[{thread_index}] {zh} 加入了 {} 的房间 {}",k.belongs_to , k.name));
+                                        client.try_clone().unwrap().write_all(&format!("JoinRoomSucess {} ", k.name).as_bytes()).expect("内部错误：发送数据失败");
+                                        thread::sleep(Duration::from_millis(100));
+                                        for (user, cc) in get_online_users().lock().unwrap().iter() {
+                                            if *user == k.belongs_to {
+                                                cc.try_clone().unwrap().write_all(&format!("game start {} ", *zh).as_bytes()).expect("内部错误：发送数据失败");
+                                                break;
+                                            }
+                                        }
+                                        return String::from(format!("game start {} ", k.belongs_to));
+                                    } else {
+                                        return String::from("tip [E116]参数错误(房间已满) ");
+                                    }
+                                }
+                            }
+                            return String::from("tip [E117]参数错误(房间不存在) ");
                         }
                         _ => return String::from("tip [E111]参数错误(无法解析的数据) ")
                     }

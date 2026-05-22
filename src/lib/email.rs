@@ -1,6 +1,7 @@
 use lettre::message::{header::ContentType, Mailbox, Message};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{SmtpTransport, Transport};
+use crate::lib::server::log;
 
 pub struct EmailSender {
     from_email: String,
@@ -37,10 +38,7 @@ impl EmailSender {
             .credentials(creds)
             .build();
 
-        match mailer.send(&email) {
-            Ok(_) => println!("邮件发送成功至: {}", to),
-            Err(e) => eprintln!("邮件发送失败: {}", e),
-        }
+        mailer.send(&email)?;
 
         Ok(())
     }

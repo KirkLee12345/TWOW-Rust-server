@@ -2,7 +2,7 @@ use std::fs;
 use rand::Rng;
 use crate::lib::email;
 use email::EmailSender;
-use crate::lib::server::FROM_EMAIL;
+use crate::lib::server::{log, FROM_EMAIL};
 
 fn generate_yzm() -> String {
     let mut rng = rand::thread_rng();
@@ -21,7 +21,7 @@ pub fn send_yzm(thread_index: usize, email: String) -> String {
     let body = format!("感谢您注册兵者账号!您本次注册的验证码为 {yzm} ,请尽快完成注册!");
 
     match email_sender.send_email(&email, subject, &body) {
-        Ok(_) => println!("[{thread_index}] 验证码 {yzm} 已发送至: {email}"),
+        Ok(_) => log(format!("[{thread_index}] 验证码 {yzm} 已发送至: {email}")),
         Err(e) => eprintln!("[{thread_index}] 发送验证码失败: {e}"),
     }
 
