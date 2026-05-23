@@ -11,7 +11,7 @@ use crate::lib::game;
 use game::handle_data;
 
 const VERSION: &str = "1.2.3";
-const IS_DEBUG: bool = false;
+const IS_DEBUG: bool = true;
 pub(crate) const PROTOCOL_VERSION: i32 = 3;
 pub(crate) const FROM_EMAIL: &str = "TDR_Group@foxmail.com";
 

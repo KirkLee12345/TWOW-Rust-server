@@ -29,6 +29,16 @@ fn delete_room_by_belongs(user: &String) {
 }
 
 
+pub fn get_client_by_user_name(user: &String) -> Option<TcpStream> {
+    for (k, v) in get_online_users().lock().unwrap().iter() {
+        if *k == *user {
+            return Some(v.try_clone().unwrap());
+        }
+    }
+    None
+}
+
+
 fn hash(s: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(s);
@@ -306,7 +316,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                     return String::from("null");
                 }
                 "nowinfo" => {
-                    return room::room_refresh(zh);
+                    return room::room_refresh(thread_index, zh);
                 }
 
 
