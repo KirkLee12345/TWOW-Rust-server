@@ -1,13 +1,14 @@
 use std::io::Write;
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use crate::lib::sign::send_yzm;
 use crate::lib::users::{is_email_exist, is_user_exist, load_user_data, load_user_info, save_user_data, save_user_info, UserData, UserInfo};
 use sha2::{Sha256, Digest};
-use crate::lib::server::{log, PROTOCOL_VERSION};
+use crate::lib::server::{log, IS_DEBUG, PROTOCOL_VERSION};
 use std::time::Duration;
 use crate::lib::room;
+use crate::lib::room::check_is_in_room_by_user;
 
 pub(crate) static USERNAME_SOCKET_ROOM: OnceLock<Mutex<Vec<(String, TcpStream)>>> = OnceLock::new();
 pub(crate) static EMA_YZM: OnceLock<Mutex<Vec<(String, String)>>> = OnceLock::new();
@@ -39,13 +40,22 @@ pub fn get_client_by_user_name(user: &String) -> Option<TcpStream> {
     None
 }
 
-pub fn remove_user(user: &String, thread_index: usize) {
-    exit_room(user, thread_index);
+pub fn remove_user(zh: &String, thread_index: usize) {
+    if check_is_in_room_by_user(zh) { exit_room(zh, thread_index); }
     let mut online_users = get_online_users().lock().unwrap();
-    if let Some(pos) = online_users.iter().position(|(k, _)| *k == *user) {
-        log(format!("[{thread_index}] 玩家 {user} 断开连接，注销登陆", ));
+    if let Some(pos) = online_users.iter().position(|(k, _)| *k == *zh) {
+        log(format!("[{thread_index}] 玩家 {zh} 断开连接，注销登陆", ));
         online_users.remove(pos);
     }
+}
+
+pub fn is_user_online(zh: &String) -> bool {
+    for (k, _) in get_online_users().lock().unwrap().iter() {
+        if *k == *zh {
+            return true;
+        }
+    }
+    false
 }
 
 
@@ -166,17 +176,20 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                         Ok(n) => {
                             match n {
                                 PROTOCOL_VERSION => {
-                                    for (k, _) in get_online_users().lock().unwrap().iter() {
-                                        if *k == data[2].to_string() {
-                                            return String::from("重复登陆!");
-                                        }
-                                    }
                                     if is_user_exist(data[2]).unwrap() {
                                         if load_user_info(data[2]).unwrap().unwrap().password_hash == hash(data[3]) {
-                                            get_online_users().lock().unwrap().push((data[2].to_string(), client));
                                             log(format!("[{thread_index}] {} 登陆成功", data[2]));
                                             *is_login = true;
                                             *zh = data[2].to_string();
+                                            if is_user_online(zh) {
+                                                if IS_DEBUG { log(format!("[{thread_index}] 发送数据: 重复登陆!")); }
+                                                get_client_by_user_name(zh).unwrap().write_all("重复登陆!".as_bytes()).expect("发送错误");
+                                                // 下面这行代码因为客户端bug才加上直接关闭原地连接的
+                                                get_client_by_user_name(zh).unwrap().shutdown(Shutdown::Both).expect("断开原地连接失败");
+                                                remove_user(zh, thread_index);
+                                                log(format!("[{thread_index}] {} 异地登陆成功，原地登陆已下线", data[2]));
+                                            }
+                                            get_online_users().lock().unwrap().push((data[2].to_string(), client));
                                             return String::from("登陆成功!");
                                         } else {
                                             return String::from("账号密码错误!");
