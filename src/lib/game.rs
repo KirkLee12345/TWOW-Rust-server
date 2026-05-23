@@ -21,7 +21,6 @@ fn get_ema_yzm() -> &'static Mutex<Vec<(String, String)>> {
     EMA_YZM.get_or_init(|| Mutex::new(vec![]))
 }
 
-
 fn delete_room_by_belongs(user: &String, thread_index: usize) {
     let mut rooms = room::get_rooms().lock().unwrap();
     if let Some(pos) = rooms.iter().position(|r| r.belongs_to == *user) {
@@ -29,7 +28,6 @@ fn delete_room_by_belongs(user: &String, thread_index: usize) {
         rooms.remove(pos);
     }
 }
-
 
 pub fn get_client_by_user_name(user: &String) -> Option<TcpStream> {
     for (k, v) in get_online_users().lock().unwrap().iter() {
@@ -57,7 +55,6 @@ pub fn is_user_online(zh: &String) -> bool {
     }
     false
 }
-
 
 fn hash(s: &str) -> String {
     let mut hasher = Sha256::new();
@@ -357,12 +354,15 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                 }
                 "use" => {
                     if !room::is_user_now_in_room(zh) { return String::from("tip [E123]参数错误(不是该玩家的回合) ");}
-                    return room::room_use(thread_index, zh, data[2].parse::<usize>().unwrap());
+                    let card_index = data[3].parse::<usize>().unwrap();
+                    if card_index < 0 || card_index >= 8 { return String::from("tip [E124]参数错误(未知手牌) ");}
+                    room::room_use(thread_index, zh, card_index);
+                    return String::from("null");
                 }
-                _ => return String::from("tip [E124]参数错误(无法解析的数据) ")
+                _ => return String::from("tip [E125]参数错误(无法解析的数据) ")
             }
         }
-        _ => return String::from("tip [E125]无法解析的数据")
+        _ => return String::from("tip [E126]无法解析的数据")
     }
     unreachable!()
 }

@@ -33,8 +33,7 @@ pub struct Room {
     pub belongs_to: String,
     pub guest: String,
     pub now: usize,
-    pub player1: Player,
-    pub player2: Player,
+    pub player: [Player; 2],
     pub last_card: Card,
     pub all_cards: Vec<Card>,
 }
@@ -64,8 +63,7 @@ impl Default for Room {
             belongs_to: "".to_string(),
             guest: "".to_string(),
             now: 0,
-            player1: Player::default(),
-            player2: Player::default(),
+            player: [Player::default(), Player::default()],
             last_card: Card::Empty,
             all_cards: vec![],
         }
@@ -132,25 +130,11 @@ impl Card {
 }
 
 impl Room {
-    pub fn get_random_card_to_player1(&mut self) -> bool {
+    pub fn get_random_card_to_player(&mut self, p: usize) -> bool {
         if self.all_cards.is_empty() {
             return false;
         }
-        let empty_slot = match self.player1.hand_cards.iter_mut()
-            .find(|slot| matches!(slot, Card::Empty))
-        {
-            Some(slot) => slot,
-            None => return true,
-        };
-        let idx = rand::thread_rng().gen_range(0..self.all_cards.len());
-        *empty_slot = self.all_cards.swap_remove(idx);
-        true
-    }
-    pub fn get_random_card_to_player2(&mut self) -> bool {
-        if self.all_cards.is_empty() {
-            return false;
-        }
-        let empty_slot = match self.player2.hand_cards.iter_mut()
+        let empty_slot = match self.player[p].hand_cards.iter_mut()
             .find(|slot| matches!(slot, Card::Empty))
         {
             Some(slot) => slot,
@@ -172,46 +156,23 @@ impl Room {
             self.all_cards.push(Card::Skill(4));
         }
     }
-    pub fn panduan_player1_is_can_continue(&mut self, thread_index:usize) -> bool {
+    pub fn panduan_player_is_can_continue(&mut self, thread_index:usize, p: usize) -> bool {
         let mut cnt: u8 = 0;
         for i in 0..8 {
-            match self.player1.hand_cards[i] {
+            match self.player[p].hand_cards[i] {
                 Card::Empty => continue,
                 _ => cnt += 1,
             }
         }
         if cnt == 0 {
             for i in 0..2 {
-                if let Card::Skill(num) = self.player1.passive_cards[i] {
-                    self.player1.passive_cards[i] = Card::Empty;
-                    for _ in 0..num { self.get_random_card_to_player1(); }
+                if let Card::Skill(num) = self.player[p].passive_cards[i] {
+                    self.player[p].passive_cards[i] = Card::Empty;
+                    for _ in 0..num { self.get_random_card_to_player(p); }
                     let text1 = format!("log 你的被动卡牌被触发了，你摸了{num}张卡牌继续战斗!");
                     let text2 = format!("log 对方被动卡牌被触发了，对方摸了{num}张卡牌继续战斗!");
-                    self.log(thread_index, &self.belongs_to, text1, text2);
-                    return true;
-                }
-            }
-            false
-        } else {
-            true
-        }
-    }
-    pub fn panduan_player2_is_can_continue(&mut self, thread_index:usize) -> bool {
-        let mut cnt: u8 = 0;
-        for i in 0..8 {
-            match self.player2.hand_cards[i] {
-                Card::Empty => continue,
-                _ => cnt += 1,
-            }
-        }
-        if cnt == 0 {
-            for i in 0..2 {
-                if let Card::Skill(num) = self.player2.passive_cards[i] {
-                    self.player2.passive_cards[i] = Card::Empty;
-                    for _ in 0..num { self.get_random_card_to_player2(); }
-                    let text1 = format!("log 你的被动卡牌被触发了，你摸了{num}张卡牌继续战斗!");
-                    let text2 = format!("log 对方被动卡牌被触发了，对方摸了{num}张卡牌继续战斗!");
-                    self.log(thread_index, &self.guest, text1, text2);
+                    if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
+                    else { self.log(thread_index, &self.guest, text1, text2); }
                     return true;
                 }
             }
@@ -258,96 +219,60 @@ impl Room {
         thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
     }
     pub fn pass(&mut self, thread_index: usize, user_name: &String, card_index: usize) -> String {
-        if self.belongs_to == *user_name {
-            match self.player1.hand_cards[card_index] {
-                Card::AddEnergy(0) => (),
-                Card::Attack(0) => (),
-                Card::ConsumeEnergy(0) => (),
-                Card::Shield(0) => (),
-                Card::Empty => return "tip [E126]参数错误(该手牌不存在) ".to_string(),
-                _ => return "tip [E127]参数错误(该手牌不能作为被动卡牌) ".to_string(),
-            }
-            for i in 0..2 {
-                match self.player1.passive_cards[i] {
-                    Card::Empty => {
-                        self.player1.passive_cards[i] = self.player1.hand_cards[card_index];
-                        self.player1.hand_cards[card_index] = Card::Empty;
-                        self.log(thread_index, user_name, "log 你放置了一张被动卡牌 ".to_string(), "log 对方放置了一张被动卡牌 ".to_string());
-                        return "null".to_string();
-                    },
-                    _ => (),
-                }
-            }
-            return "tip [E128]参数错误(被动卡槽已满) ".to_string();
+        let mut p: usize = 0;
+        if self.belongs_to == *user_name { p = 0; }
+        if self.guest == *user_name { p = 1; }
+        match self.player[p].hand_cards[card_index] {
+            Card::AddEnergy(0) => (),
+            Card::Attack(0) => (),
+            Card::ConsumeEnergy(0) => (),
+            Card::Shield(0) => (),
+            Card::Empty => return "tip [E129]参数错误(该手牌不存在) ".to_string(),
+            _ => return "tip [E130]参数错误(该手牌不能作为被动卡牌) ".to_string(),
         }
-        if self.guest == *user_name {
-            match self.player2.hand_cards[card_index] {
-                Card::AddEnergy(0) => (),
-                Card::Attack(0) => (),
-                Card::ConsumeEnergy(0) => (),
-                Card::Shield(0) => (),
-                Card::Empty => return "tip [E129]参数错误(该手牌不存在) ".to_string(),
-                _ => return "tip [E130]参数错误(该手牌不能作为被动卡牌) ".to_string(),
+        for i in 0..2 {
+            match self.player[p].passive_cards[i] {
+                Card::Empty => {
+                    self.player[p].passive_cards[i] = self.player[p].hand_cards[card_index];
+                    self.player[p].hand_cards[card_index] = Card::Empty;
+                    self.log(thread_index, user_name, "log 你放置了一张被动卡牌 ".to_string(), "log 对方放置了一张被动卡牌 ".to_string());
+                    return "null".to_string();
+                },
+                _ => (),
             }
-            for i in 0..2 {
-                match self.player2.passive_cards[i] {
-                    Card::Empty => {
-                        self.player2.passive_cards[i] = self.player2.hand_cards[card_index];
-                        self.player2.hand_cards[card_index] = Card::Empty;
-                        self.log(thread_index, user_name, "log 你放置了一张被动卡牌 ".to_string(), "log 对方放置了一张被动卡牌 ".to_string());
-                        return "null".to_string();
-                    },
-                    _ => (),
-                }
-            }
-            return "tip [E131]参数错误(被动卡槽已满) ".to_string();
         }
-        unreachable!();
+        "tip [E131]参数错误(被动卡槽已满) ".to_string()
     }
     pub fn nnext(&mut self, thread_index: usize) -> bool {
-        if self.now == 1 {
-            self.now = 2;
-            if self.player1.energy < 6 {
-                self.player1.energy += 2;
-                if self.player1.energy > 6 {
-                    self.player1.energy = 6;
-                }
+        if self.player[self.now-1].energy < 6 {
+            self.player[self.now-1].energy += 2;
+            if self.player[self.now-1].energy > 6 {
+                self.player[self.now-1].energy = 6;
             }
-            if !self.player1.used {
-                if !self.get_random_card_to_player1() {
-                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
-                    get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
-                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
-                    get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
-                    log(format!("房间 {} 平局", self.name));
-                    return true;
-                }
-            }
-            self.player1.used = false;
-            return false;
         }
-        if self.now == 2 {
-            self.now = 1;
-            if self.player2.energy < 6 {
-                self.player2.energy += 2;
-                if self.player2.energy > 6 {
-                    self.player2.energy = 6;
-                }
+        if !self.player[self.now-1].used {
+            if !self.get_random_card_to_player(self.now-1) {
+                if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+                get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
+                if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+                get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
+                log(format!("房间 {} 平局", self.name));
+                return true;
             }
-            if !self.player2.used {
-                if !self.get_random_card_to_player2() {
-                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
-                    get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
-                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
-                    get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
-                    log(format!("房间 {} 平局", self.name));
-                    return true;
-                }
-            }
-            self.player2.used = false;
-            return false;
         }
-        unreachable!();
+        self.player[self.now-1].used = false;
+        if self.now == 1 { self.now = 2}
+        else { self.now = 1}
+        false
+    }
+    pub fn use_card(&mut self, thread_index: usize, user_name: &String, card_index: usize) {
+        if *user_name == self.belongs_to {
+
+        }
+        if *user_name == self.guest {
+
+        }
+        unreachable!()
     }
 }
 
@@ -356,12 +281,12 @@ pub fn room_start(room_name: &String) {
         if room.name == *room_name {
             if room.now != 0 { return; }
             room.now = 1;
-            room.player1.energy = 4;
-            room.player2.energy = 4;
+            room.player[0].energy = 4;
+            room.player[1].energy = 4;
             room.init_all_cards();
             for _ in 0..6 {
-                room.get_random_card_to_player1();
-                room.get_random_card_to_player2();
+                room.get_random_card_to_player(0);
+                room.get_random_card_to_player(1);
             }
             break;
         }
@@ -408,136 +333,80 @@ pub fn room_refresh(thread_index: usize, user_name: &String) {
     for room in get_rooms().lock().unwrap().iter_mut() {
         if room.name == room_name {
             let mut r = "game nowinfo".to_string();
+            let mut p = 0;
+            let mut pp = 1;
             if room.belongs_to == *user_name {
-                for i in room.player1.hand_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                for i in room.player1.passive_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                for i in room.player2.hand_cards {
-                    r.push(' ');
-                    match i {
-                        Card::Empty => r.push('0'),
-                        _ => r.push('b')
-                    }
-                }
-                for i in room.player2.passive_cards {
-                    r.push(' ');
-                    match i {
-                        Card::Empty => r.push('0'),
-                        _ => r.push('b')
-                    }
-                }
-                r.push(' ');
-                if room.all_cards.len() > 0 {
-                    r.push('b');
-                } else {
-                    r.push('0');
-                }
-                for i in room.player1.out_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                for i in room.player2.out_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                r.push(' ');
-                r.push_str(room.player1.energy.to_string().as_str());
-                r.push(' ');
-                r.push_str(room.player2.energy.to_string().as_str());
-                r.push(' ');
-                r.push_str(room.all_cards.len().to_string().as_str());
-                r.push(' ');
-                if room.now == 1 {
-                    r.push('1');
-                } else {
-                    r.push('0');
-                }
-                r.push(' ');
-                r.push_str(room.last_card.to_str().as_str());
-                if !room.panduan_player1_is_can_continue(thread_index) {
-                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end loss "));}
-                    get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
-                    log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
-                    remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
-                }
-                if !room.panduan_player2_is_can_continue(thread_index) {
-                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
-                    get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
-                    log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
-                    remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
-                }
+                p = 0;
+                pp = 1;
             } else {
-                for i in room.player2.hand_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                for i in room.player2.passive_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                for i in room.player1.hand_cards {
-                    r.push(' ');
-                    match i {
-                        Card::Empty => r.push('0'),
-                        _ => r.push('b')
-                    }
-                }
-                for i in room.player1.passive_cards {
-                    r.push(' ');
-                    match i {
-                        Card::Empty => r.push('0'),
-                        _ => r.push('b')
-                    }
-                }
+                p = 1;
+                pp = 0;
+            }
+            for i in room.player[p].hand_cards {
                 r.push(' ');
-                if room.all_cards.len() > 0 {
-                    r.push('b');
-                } else {
-                    r.push('0');
-                }
-                for i in room.player2.out_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
-                for i in room.player1.out_cards {
-                    r.push(' ');
-                    r.push_str(i.to_str().as_str())
-                }
+                r.push_str(i.to_str().as_str())
+            }
+            for i in room.player[p].passive_cards {
                 r.push(' ');
-                r.push_str(room.player2.energy.to_string().as_str());
+                r.push_str(i.to_str().as_str())
+            }
+            for i in room.player[pp].hand_cards {
                 r.push(' ');
-                r.push_str(room.player1.energy.to_string().as_str());
-                r.push(' ');
-                r.push_str(room.all_cards.len().to_string().as_str());
-                r.push(' ');
-                if room.now == 2 {
-                    r.push('1');
-                } else {
-                    r.push('0');
+                match i {
+                    Card::Empty => r.push('0'),
+                    _ => r.push('b')
                 }
+            }
+            for i in room.player[pp].passive_cards {
                 r.push(' ');
-                r.push_str(room.last_card.to_str().as_str());
-                if !room.panduan_player2_is_can_continue(thread_index) {
-                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end loss "));}
-                    get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
-                    log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
-                    remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+                match i {
+                    Card::Empty => r.push('0'),
+                    _ => r.push('b')
                 }
-                if !room.panduan_player1_is_can_continue(thread_index) {
-                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
-                    get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
-                    log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
-                    remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
-                }
+            }
+            r.push(' ');
+            if room.all_cards.len() > 0 {
+                r.push('b');
+            } else {
+                r.push('0');
+            }
+            for i in room.player[p].out_cards {
+                r.push(' ');
+                r.push_str(i.to_str().as_str())
+            }
+            for i in room.player[pp].out_cards {
+                r.push(' ');
+                r.push_str(i.to_str().as_str())
+            }
+            r.push(' ');
+            r.push_str(room.player[p].energy.to_string().as_str());
+            r.push(' ');
+            r.push_str(room.player[pp].energy.to_string().as_str());
+            r.push(' ');
+            r.push_str(room.all_cards.len().to_string().as_str());
+            r.push(' ');
+            if room.now == 1 {
+                if p == 0 { r.push('1'); }
+                else { r.push('0'); }
+            } else {
+                if pp == 0 { r.push('1'); }
+                else { r.push('0'); }
+            }
+            r.push(' ');
+            r.push_str(room.last_card.to_str().as_str());
+            if !room.panduan_player_is_can_continue(thread_index, p) {
+                if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end loss "));}
+                get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
+                log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
+                remove_room_by_room_name(&room_name, thread_index);
+                thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+            }
+            if !room.panduan_player_is_can_continue(thread_index, pp) {
+                if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
+                get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
+                log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
+                remove_room_by_room_name(&room_name, thread_index);
+                thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
             }
             r.push(' ');
             if IS_DEBUG {log(format!("[{thread_index}] 发送数据: {r}"));}
@@ -589,6 +458,15 @@ pub(crate) fn room_next(thread_index: usize, user_name: &mut String) {
     }
 }
 
-pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: usize) -> String {
-    todo!()
+pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: usize) {
+    let mut player1_name = "".to_string();
+    let mut player2_name = "".to_string();
+    let room_name = get_room_name_by_user(user_name);
+    if let Some(room) = get_rooms().lock().unwrap().iter_mut().find(|r| r.name == room_name) {
+        player1_name = room.belongs_to.clone();
+        player2_name = room.guest.clone();
+        room.use_card(thread_index, user_name, card_index);
+    }
+    room_refresh(thread_index, &player1_name);
+    room_refresh(thread_index, &player2_name);
 }
