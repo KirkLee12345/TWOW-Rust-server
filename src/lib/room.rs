@@ -1,4 +1,3 @@
-use std::hint::unreachable_unchecked;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
@@ -6,7 +5,8 @@ use std::thread;
 use std::time::Duration;
 use rand::Rng;
 use crate::lib::game::get_client_by_user_name;
-use crate::lib::server::log;
+use crate::lib::server::{log, IS_DEBUG, SLPPE_TIME_MILLIS};
+
 
 pub(crate) static ROOMS: OnceLock<Mutex<Vec<Room>>> = OnceLock::new();
 
@@ -255,7 +255,7 @@ impl Room {
             log(format!("[{thread_index}] 向 {} 房间的房主玩家发送信息 {r2}", self.name));
             log(format!("[{thread_index}] 向 {} 房间的访客玩家发送信息 {r1}", self.name));
         }
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
     }
     pub fn pass(&mut self, thread_index: usize, user_name: &String, card_index: usize) -> String {
         if self.belongs_to == *user_name {
@@ -303,6 +303,36 @@ impl Room {
             return "tip [E131]参数错误(被动卡槽已满) ".to_string();
         }
         unreachable!();
+    }
+    pub fn nnext(&mut self) {
+        if self.now == 1 {
+            self.now = 2;
+            if self.player1.energy < 6 {
+                self.player1.energy += 2;
+                if self.player1.energy > 6 {
+                    self.player1.energy = 6;
+                }
+            }
+            if !self.player1.used {
+                self.get_random_card_to_player1();
+            }
+            self.player1.used = false;
+            return
+        }
+        if self.now == 2 {
+            self.now = 1;
+            if self.player2.energy < 6 {
+                self.player2.energy += 2;
+                if self.player2.energy > 6 {
+                    self.player2.energy = 6;
+                }
+            }
+            if !self.player2.used {
+                self.get_random_card_to_player2();
+            }
+            self.player2.used = false;
+            return
+        }
     }
 }
 
@@ -358,7 +388,7 @@ pub fn is_user_now_in_room(user_name: &String) -> bool {
     false
 }
 
-pub fn room_refresh(thread_index: usize, user_name: &String) -> String {
+pub fn room_refresh(thread_index: usize, user_name: &String) {
     let room_name = get_room_name_by_user(user_name);
     for room in get_rooms().lock().unwrap().iter_mut() {
         if room.name == room_name {
@@ -415,16 +445,18 @@ pub fn room_refresh(thread_index: usize, user_name: &String) -> String {
                 r.push(' ');
                 r.push_str(room.last_card.to_str().as_str());
                 if !room.panduan_player1_is_can_continue(thread_index) {
+                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end loss "));}
                     get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
                     log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
                     remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
                 }
                 if !room.panduan_player2_is_can_continue(thread_index) {
+                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
                     get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
                     log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
                     remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
                 }
             } else {
                 for i in room.player2.hand_cards {
@@ -478,40 +510,62 @@ pub fn room_refresh(thread_index: usize, user_name: &String) -> String {
                 r.push(' ');
                 r.push_str(room.last_card.to_str().as_str());
                 if !room.panduan_player2_is_can_continue(thread_index) {
+                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end loss "));}
                     get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
                     log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
                     remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
                 }
                 if !room.panduan_player1_is_can_continue(thread_index) {
+                    if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
                     get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
                     log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
                     remove_room_by_room_name(&room_name, thread_index);
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
                 }
             }
             r.push(' ');
-            return r;
+            if IS_DEBUG {log(format!("[{thread_index}] 发送数据: {r}"));}
+            get_client_by_user_name(user_name).unwrap().write_all(r.as_bytes()).unwrap();
+            return;
         }
     }
     unreachable!();
 }
 
 pub fn room_pass(thread_index: usize, user_name: &mut String, card_index: usize) -> String {
+    let mut r = "null".to_string();
+    let mut player1_name = "".to_string();
+    let mut player2_name = "".to_string();
     let room_name = get_room_name_by_user(user_name);
     for room in get_rooms().lock().unwrap().iter_mut() {
         if room.name == room_name {
-            let r =  room.pass(thread_index, user_name, card_index);
-            room_refresh(thread_index, &room.belongs_to);
-            room_refresh(thread_index, &room.guest);
-            return r;
+            r = room.pass(thread_index, user_name, card_index);
+            player1_name = room.belongs_to.clone();
+            player2_name = room.guest.clone();
+
         }
     }
-    unreachable!();
+    room_refresh(thread_index, &player1_name);
+    room_refresh(thread_index, &player2_name);
+    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+    r
 }
 
-pub(crate) fn room_next(thread_index: usize, user_name: &mut String) -> String {
-    todo!()
+pub(crate) fn room_next(thread_index: usize, user_name: &mut String) {
+    let mut player1_name = "".to_string();
+    let mut player2_name = "".to_string();
+    let room_name = get_room_name_by_user(user_name);
+    for room in get_rooms().lock().unwrap().iter_mut() {
+        if room.name == room_name {
+            room.nnext();
+            player1_name = room.belongs_to.clone();
+            player2_name = room.guest.clone();
+            break;
+        }
+    }
+    room_refresh(thread_index, &player1_name);
+    room_refresh(thread_index, &player2_name);
 }
 
 pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: usize) -> String {

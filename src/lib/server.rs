@@ -10,10 +10,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::lib::game;
 use game::handle_data;
 
-const VERSION: &str = "1.2.3";
-const IS_DEBUG: bool = true;
+pub(crate) const VERSION: &str = "1.2.3";
 pub(crate) const PROTOCOL_VERSION: i32 = 3;
+pub(crate) const IS_DEBUG: bool = true;
 pub(crate) const FROM_EMAIL: &str = "TDR_Group@foxmail.com";
+pub(crate) const SLPPE_TIME_MILLIS: u64 = 10;
 
 static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

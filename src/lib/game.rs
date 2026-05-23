@@ -316,7 +316,8 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                     return String::from("null");
                 }
                 "nowinfo" => {
-                    return room::room_refresh(thread_index, zh);
+                    room::room_refresh(thread_index, zh);
+                    return String::from("null");
                 }
                 "pass" => {
                     if !room::is_user_now_in_room(zh) { return String::from("tip [E121]参数错误(不是该玩家的回合) ");}
@@ -324,7 +325,8 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                 }
                 "next" => {
                     if !room::is_user_now_in_room(zh) { return String::from("tip [E122]参数错误(不是该玩家的回合) ");}
-                    return room::room_next(thread_index, zh);
+                    room::room_next(thread_index, zh);
+                    return String::from("null");
                 }
                 "use" => {
                     if !room::is_user_now_in_room(zh) { return String::from("tip [E123]参数错误(不是该玩家的回合) ");}
@@ -335,6 +337,5 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
         }
         _ => return String::from("tip [E125]无法解析的数据")
     }
-
     unreachable!()
 }
