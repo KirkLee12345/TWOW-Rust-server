@@ -336,7 +336,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                     return String::from(format!("game log {zh}:{r}"));
                 }
                 "start" => {
-                    room::room_start(&room::get_room_name_by_user(zh));
+                    room::room_start(&room::get_room_name_by_user(zh), thread_index);
                     return String::from("null");
                 }
                 "nowinfo" => {

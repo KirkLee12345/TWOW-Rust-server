@@ -13,11 +13,11 @@ pub(crate) static ROOMS: OnceLock<Mutex<Vec<Room>>> = OnceLock::new();
 #[derive(Clone, Copy)]
 pub enum Card {
     Empty,
-    Attack(i8),
-    Shield(i8),
-    AddEnergy(i8),
-    ConsumeEnergy(i8),
-    Skill(i8),
+    Attack(i32),
+    Shield(i32),
+    AddEnergy(i32),
+    ConsumeEnergy(i32),
+    Skill(i32),
 }
 
 pub struct Player {
@@ -130,19 +130,23 @@ impl Card {
 }
 
 impl Room {
-    pub fn get_random_card_to_player(&mut self, p: usize) -> bool {
+    pub fn get_random_card_to_player(&mut self, p: usize, thread_index: usize) {
         if self.all_cards.is_empty() {
-            return false;
+            if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+            get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
+            if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+            get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
+            log(format!("房间 {} 平局", self.name));
+            return;
         }
         let empty_slot = match self.player[p].hand_cards.iter_mut()
             .find(|slot| matches!(slot, Card::Empty))
         {
             Some(slot) => slot,
-            None => return true,
+            None => return,
         };
         let idx = rand::thread_rng().gen_range(0..self.all_cards.len());
         *empty_slot = self.all_cards.swap_remove(idx);
-        true
     }
     pub fn init_all_cards(&mut self) {
         for _ in 0..4 {
@@ -168,7 +172,7 @@ impl Room {
             for i in 0..2 {
                 if let Card::Skill(num) = self.player[p].passive_cards[i] {
                     self.player[p].passive_cards[i] = Card::Empty;
-                    for _ in 0..num { self.get_random_card_to_player(p); }
+                    for _ in 0..num { self.get_random_card_to_player(p, thread_index); }
                     let text1 = format!("log 你的被动卡牌被触发了，你摸了{num}张卡牌继续战斗!");
                     let text2 = format!("log 对方被动卡牌被触发了，对方摸了{num}张卡牌继续战斗!");
                     if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
@@ -251,32 +255,78 @@ impl Room {
             }
         }
         if !self.player[self.now-1].used {
-            if !self.get_random_card_to_player(self.now-1) {
-                if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
-                get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
-                if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
-                get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
-                log(format!("房间 {} 平局", self.name));
-                return true;
-            }
+            self.get_random_card_to_player(self.now-1, thread_index)
         }
         self.player[self.now-1].used = false;
         if self.now == 1 { self.now = 2}
         else { self.now = 1}
         false
     }
-    pub fn use_card(&mut self, thread_index: usize, user_name: &String, card_index: usize) {
+    pub fn use_card(&mut self, thread_index: usize, user_name: &String, card_index: usize) -> String {
+        let mut p: usize = 0;
+        let mut pp: usize = 1;
         if *user_name == self.belongs_to {
-
+            p = 0;
+            pp = 1;
         }
         if *user_name == self.guest {
-
+            p = 1;
+            pp = 0;
+        }
+        match self.player[p].hand_cards[card_index] {
+            Card::Empty => return "tip [E128]参数错误(该手牌不存在) ".to_string(),
+            Card::Skill(num) => {
+                self.player[p].hand_cards[card_index] = Card::Empty;
+                self.player[p].used = true;
+                self.last_card = Card::Skill(num);
+                for _ in 0..num {
+                    self.get_random_card_to_player(p, thread_index);
+                }
+                self.log(thread_index, user_name, format!("log 你使用了一张回血牌，摸了{num}张牌 "), format!("log 对方使用了一张回血牌，摸了{num}张牌 "));
+                return "null".to_string();
+            }
+            Card::AddEnergy(num) => {
+                self.player[p].hand_cards[card_index] = Card::Empty;
+                self.last_card = Card::AddEnergy(num);
+                self.player[p].used = true;
+                self.add_energy();
+                return "null".to_string();
+            }
+            Card::ConsumeEnergy(num) => {
+                self.player[p].hand_cards[card_index] = Card::Empty;
+                self.last_card = Card::ConsumeEnergy(num);
+                self.player[p].used = true;
+                self.consume_energy();
+                return "null".to_string();
+            }
+            Card::Shield(num) => {
+                if self.player[p].energy < num { return "tip [E132]参数错误(能量不足) ".to_string(); }
+                self.player[p].energy -= num;
+                if !self.defend() {
+                    self.player[p].energy += num;
+                    return "tip [E133]参数错误(盾牌槽已满) ".to_string();
+                }
+                self.last_card = Card::Shield(num);
+                self.player[p].hand_cards[card_index] = Card::Empty;
+                self.player[p].used = true;
+                return "null".to_string();
+            }
+            Card::Attack(num) => {
+                if self.player[p].energy < num { return "tip [E134]参数错误(能量不足) ".to_string(); }
+                self.player[p].hand_cards[card_index] = Card::Empty;
+                self.last_card = Card::Attack(num);
+                self.player[p].energy -= num;
+                self.player[p].used = true;
+                self.damage();
+                room_next(thread_index, &self.belongs_to);
+                return "null".to_string();
+            }
         }
         unreachable!()
     }
 }
 
-pub fn room_start(room_name: &String) {
+pub fn room_start(room_name: &String, thread_index: usize) {
     for room in get_rooms().lock().unwrap().iter_mut() {
         if room.name == *room_name {
             if room.now != 0 { return; }
@@ -285,8 +335,8 @@ pub fn room_start(room_name: &String) {
             room.player[1].energy = 4;
             room.init_all_cards();
             for _ in 0..6 {
-                room.get_random_card_to_player(0);
-                room.get_random_card_to_player(1);
+                room.get_random_card_to_player(0, thread_index);
+                room.get_random_card_to_player(1, thread_index);
             }
             break;
         }
@@ -436,7 +486,7 @@ pub fn room_pass(thread_index: usize, user_name: &mut String, card_index: usize)
     r
 }
 
-pub(crate) fn room_next(thread_index: usize, user_name: &mut String) {
+pub(crate) fn room_next(thread_index: usize, user_name: &String) {
     let mut player1_name = "".to_string();
     let mut player2_name = "".to_string();
     let mut is_game_p = false;
@@ -458,15 +508,18 @@ pub(crate) fn room_next(thread_index: usize, user_name: &mut String) {
     }
 }
 
-pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: usize) {
+pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: usize) -> String {
     let mut player1_name = "".to_string();
     let mut player2_name = "".to_string();
     let room_name = get_room_name_by_user(user_name);
+    let mut r = "null".to_string();
     if let Some(room) = get_rooms().lock().unwrap().iter_mut().find(|r| r.name == room_name) {
         player1_name = room.belongs_to.clone();
         player2_name = room.guest.clone();
-        room.use_card(thread_index, user_name, card_index);
+        r = room.use_card(thread_index, user_name, card_index);
     }
     room_refresh(thread_index, &player1_name);
     room_refresh(thread_index, &player2_name);
+    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+    r
 }
