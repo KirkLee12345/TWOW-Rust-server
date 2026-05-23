@@ -21,9 +21,10 @@ fn get_ema_yzm() -> &'static Mutex<Vec<(String, String)>> {
 }
 
 
-fn delete_room_by_belongs(user: &String) {
+fn delete_room_by_belongs(user: &String, thread_index: usize) {
     let mut rooms = room::get_rooms().lock().unwrap();
-    if let Some(pos) = rooms.iter().position(|r| r.name == *user) {
+    if let Some(pos) = rooms.iter().position(|r| r.belongs_to == *user) {
+        log(format!("[{thread_index}] 房间 {} 已关闭", rooms[pos].name));
         rooms.remove(pos);
     }
 }
@@ -242,25 +243,25 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             return r;
                         }
                         "exit" => {
-                            let mut flag = false;
+                            let mut is_belongs = false;
                             let mut room_other = String::from("");
                             let mut room_name = String::from("");
                             for k in room::get_rooms().lock().unwrap().iter_mut() {
                                 if k.belongs_to == *zh {
-                                    flag = true;
+                                    is_belongs = true;
                                     room_other = k.guest.clone();
                                     room_name = k.name.clone();
                                     break;
                                 }
                                 if k.guest == *zh {
-                                    flag = false;
+                                    is_belongs = false;
                                     room_other = k.belongs_to.clone();
                                     room_name = k.name.clone();
                                     break;
                                 }
                             }
                             log(format!("[{thread_index}] {zh} 退出了房间 {room_name}"));
-                            if flag {
+                            if is_belongs {
                                 if room_other != "" {
                                     for (user, client) in get_online_users().lock().unwrap().iter_mut() {
                                         if *user == room_other {
@@ -270,7 +271,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                                         }
                                     }
                                 }
-                                delete_room_by_belongs(zh);
+                                delete_room_by_belongs(zh, thread_index);
                                 return String::from("tip 已退出房间 ");
                             } else {
                                 if room_other != "" {
@@ -281,7 +282,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                                             break;
                                         }
                                     }
-                                    delete_room_by_belongs(&room_other);
+                                    delete_room_by_belongs(&room_other, thread_index);
                                     return String::from("tip 已退出房间 ");
                                 } else {
                                     return String::from("tip [E115]参数错误(未加入任何房间) ");
