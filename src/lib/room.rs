@@ -346,16 +346,13 @@ pub fn remove_room_by_room_name(room_name: &String, thread_index: usize) {
     }
 }
 
-pub fn is_user_now_in_room(room_name: &String, user_name: &String) -> bool {
+pub fn is_user_now_in_room(user_name: &String) -> bool {
     for room in get_rooms().lock().unwrap().iter() {
-        if room.name == *room_name {
-            if room.belongs_to == *user_name && room.now == 1 {
-                return true;
-            }
-            if room.guest == *user_name && room.now == 2 {
-                return true;
-            }
-            return false;
+        if room.belongs_to == *user_name && room.now == 1 {
+            return true;
+        }
+        if room.guest == *user_name && room.now == 2 {
+            return true;
         }
     }
     false
