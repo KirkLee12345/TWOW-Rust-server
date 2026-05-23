@@ -264,8 +264,8 @@ impl Room {
                 Card::Attack(0) => (),
                 Card::ConsumeEnergy(0) => (),
                 Card::Shield(0) => (),
-                Card::Empty => return "tip 参数错误(该手牌不存在) ".to_string(),
-                _ => return "tip 参数错误(该手牌不能作为被动卡牌) ".to_string(),
+                Card::Empty => return "tip [E126]参数错误(该手牌不存在) ".to_string(),
+                _ => return "tip [E127]参数错误(该手牌不能作为被动卡牌) ".to_string(),
             }
             for i in 0..2 {
                 match self.player1.passive_cards[i] {
@@ -278,7 +278,7 @@ impl Room {
                     _ => (),
                 }
             }
-            return "tip 参数错误(被动卡槽已满) ".to_string();
+            return "tip [E128]参数错误(被动卡槽已满) ".to_string();
         }
         if self.guest == *user_name {
             match self.player2.hand_cards[card_index] {
@@ -286,8 +286,8 @@ impl Room {
                 Card::Attack(0) => (),
                 Card::ConsumeEnergy(0) => (),
                 Card::Shield(0) => (),
-                Card::Empty => return "tip 参数错误(该手牌不存在) ".to_string(),
-                _ => return "tip 参数错误(该手牌不能作为被动卡牌) ".to_string(),
+                Card::Empty => return "tip [E129]参数错误(该手牌不存在) ".to_string(),
+                _ => return "tip [E130]参数错误(该手牌不能作为被动卡牌) ".to_string(),
             }
             for i in 0..2 {
                 match self.player2.passive_cards[i] {
@@ -300,7 +300,7 @@ impl Room {
                     _ => (),
                 }
             }
-            return "tip 参数错误(被动卡槽已满) ".to_string();
+            return "tip [E131]参数错误(被动卡槽已满) ".to_string();
         }
         unreachable!();
     }

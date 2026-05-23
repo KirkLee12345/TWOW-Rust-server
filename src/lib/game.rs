@@ -330,11 +330,10 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                     if !room::is_user_now_in_room(zh) { return String::from("tip [E123]参数错误(不是该玩家的回合) ");}
                     return room::room_use(thread_index, zh, data[2].parse::<usize>().unwrap());
                 }
-                _ => return String::from("tip [E   ]参数错误(无法解析的数据) ")
+                _ => return String::from("tip [E124]参数错误(无法解析的数据) ")
             }
         }
-
-        _ => return String::from("tip [E   ]无法解析的数据")
+        _ => return String::from("tip [E125]无法解析的数据")
     }
 
     unreachable!()
