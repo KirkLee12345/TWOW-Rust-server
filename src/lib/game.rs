@@ -39,12 +39,69 @@ pub fn get_client_by_user_name(user: &String) -> Option<TcpStream> {
     None
 }
 
+pub fn remove_user(user: &String, thread_index: usize) {
+    exit_room(user, thread_index);
+    let mut online_users = get_online_users().lock().unwrap();
+    if let Some(pos) = online_users.iter().position(|(k, _)| *k == *user) {
+        log(format!("[{thread_index}] 玩家 {user} 断开连接，注销登陆", ));
+        online_users.remove(pos);
+    }
+}
+
 
 fn hash(s: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(s);
     let result = hasher.finalize();
     format!("{:x}", result)
+}
+
+pub fn exit_room(zh: &String, thread_index: usize) -> String {
+    let mut is_belongs = false;
+    let mut room_other = String::from("");
+    let mut room_name = String::from("");
+    for k in room::get_rooms().lock().unwrap().iter_mut() {
+        if k.belongs_to == *zh {
+            is_belongs = true;
+            room_other = k.guest.clone();
+            room_name = k.name.clone();
+            break;
+        }
+        if k.guest == *zh {
+            is_belongs = false;
+            room_other = k.belongs_to.clone();
+            room_name = k.name.clone();
+            break;
+        }
+    }
+    log(format!("[{thread_index}] {zh} 退出了房间 {room_name}"));
+    if is_belongs {
+        if room_other != "" {
+            for (user, client) in get_online_users().lock().unwrap().iter_mut() {
+                if *user == room_other {
+                    log(format!("[{thread_index}] 将访客 {user} 移出房间 {room_name}"));
+                    client.write_all("game exit ".as_bytes()).expect("发送错误");
+                    break;
+                }
+            }
+        }
+        delete_room_by_belongs(zh, thread_index);
+        String::from("tip 已退出房间 ")
+    } else {
+        if room_other != "" {
+            for (user, client) in get_online_users().lock().unwrap().iter_mut() {
+                if *user == room_other {
+                    log(format!("[{thread_index}] 将房主 {room_other} 移出房间 {room_name}"));
+                    client.write_all("game exit ".as_bytes()).expect("发送错误");
+                    break;
+                }
+            }
+            delete_room_by_belongs(&room_other, thread_index);
+            String::from("tip 已退出房间 ")
+        } else {
+            String::from("tip [E115]参数错误(未加入任何房间) ")
+        }
+    }
 }
 
 pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &mut String, client: TcpStream) -> String {
@@ -243,51 +300,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                             return r;
                         }
                         "exit" => {
-                            let mut is_belongs = false;
-                            let mut room_other = String::from("");
-                            let mut room_name = String::from("");
-                            for k in room::get_rooms().lock().unwrap().iter_mut() {
-                                if k.belongs_to == *zh {
-                                    is_belongs = true;
-                                    room_other = k.guest.clone();
-                                    room_name = k.name.clone();
-                                    break;
-                                }
-                                if k.guest == *zh {
-                                    is_belongs = false;
-                                    room_other = k.belongs_to.clone();
-                                    room_name = k.name.clone();
-                                    break;
-                                }
-                            }
-                            log(format!("[{thread_index}] {zh} 退出了房间 {room_name}"));
-                            if is_belongs {
-                                if room_other != "" {
-                                    for (user, client) in get_online_users().lock().unwrap().iter_mut() {
-                                        if *user == room_other {
-                                            log(format!("[{thread_index}] 将访客 {user} 移出房间 {room_name}"));
-                                            client.write_all("game exit ".as_bytes()).expect("发送错误");
-                                            break;
-                                        }
-                                    }
-                                }
-                                delete_room_by_belongs(zh, thread_index);
-                                return String::from("tip 已退出房间 ");
-                            } else {
-                                if room_other != "" {
-                                    for (user, client) in get_online_users().lock().unwrap().iter_mut() {
-                                        if *user == room_other {
-                                            log(format!("[{thread_index}] 将房主 {room_other} 移出房间 {room_name}"));
-                                            client.write_all("game exit ".as_bytes()).expect("发送错误");
-                                            break;
-                                        }
-                                    }
-                                    delete_room_by_belongs(&room_other, thread_index);
-                                    return String::from("tip 已退出房间 ");
-                                } else {
-                                    return String::from("tip [E115]参数错误(未加入任何房间) ");
-                                }
-                            }
+                            return exit_room(zh, thread_index);
                         }
                         _ => return String::from("tip [E116]参数错误(无法解析的数据) ")
                     }

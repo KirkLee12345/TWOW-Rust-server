@@ -8,6 +8,7 @@ use std::thread;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::lib::game;
 use game::handle_data;
+use crate::lib::game::remove_user;
 
 pub(crate) const VERSION: &str = "1.2.3";
 pub(crate) const PROTOCOL_VERSION: i32 = 3;
@@ -84,6 +85,7 @@ fn handle_connection(stream: TcpStream, thread_index: usize) {
     loop {
         match reader.read(&mut buffer) {
             Ok(0) => {
+                remove_user(&zh, thread_index);
                 log(format!("[{thread_index}] 连接关闭"));
                 break;
             }
