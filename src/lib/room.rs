@@ -1,3 +1,4 @@
+use std::hint::unreachable_unchecked;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
@@ -256,6 +257,53 @@ impl Room {
         }
         thread::sleep(Duration::from_millis(100));
     }
+    pub fn pass(&mut self, thread_index: usize, user_name: &String, card_index: usize) -> String {
+        if self.belongs_to == *user_name {
+            match self.player1.hand_cards[card_index] {
+                Card::AddEnergy(0) => (),
+                Card::Attack(0) => (),
+                Card::ConsumeEnergy(0) => (),
+                Card::Shield(0) => (),
+                Card::Empty => return "tip 参数错误(该手牌不存在) ".to_string(),
+                _ => return "tip 参数错误(该手牌不能作为被动卡牌) ".to_string(),
+            }
+            for i in 0..2 {
+                match self.player1.passive_cards[i] {
+                    Card::Empty => {
+                        self.player1.passive_cards[i] = self.player1.hand_cards[card_index];
+                        self.player1.hand_cards[card_index] = Card::Empty;
+                        self.log(thread_index, user_name, "log 你放置了一张被动卡牌 ".to_string(), "log 对方放置了一张被动卡牌 ".to_string());
+                        return "null".to_string();
+                    },
+                    _ => (),
+                }
+            }
+            return "tip 参数错误(被动卡槽已满) ".to_string();
+        }
+        if self.guest == *user_name {
+            match self.player2.hand_cards[card_index] {
+                Card::AddEnergy(0) => (),
+                Card::Attack(0) => (),
+                Card::ConsumeEnergy(0) => (),
+                Card::Shield(0) => (),
+                Card::Empty => return "tip 参数错误(该手牌不存在) ".to_string(),
+                _ => return "tip 参数错误(该手牌不能作为被动卡牌) ".to_string(),
+            }
+            for i in 0..2 {
+                match self.player2.passive_cards[i] {
+                    Card::Empty => {
+                        self.player2.passive_cards[i] = self.player2.hand_cards[card_index];
+                        self.player2.hand_cards[card_index] = Card::Empty;
+                        self.log(thread_index, user_name, "log 你放置了一张被动卡牌 ".to_string(), "log 对方放置了一张被动卡牌 ".to_string());
+                        return "null".to_string();
+                    },
+                    _ => (),
+                }
+            }
+            return "tip 参数错误(被动卡槽已满) ".to_string();
+        }
+        unreachable!();
+    }
 }
 
 pub fn room_start(room_name: &String) {
@@ -296,6 +344,21 @@ pub fn remove_room_by_room_name(room_name: &String, thread_index: usize) {
     if let Some(pos) = rooms.iter().position(|r| r.name == *room_name) {
         rooms.remove(pos);
     }
+}
+
+pub fn is_user_now_in_room(room_name: &String, user_name: &String) -> bool {
+    for room in get_rooms().lock().unwrap().iter() {
+        if room.name == *room_name {
+            if room.belongs_to == *user_name && room.now == 1 {
+                return true;
+            }
+            if room.guest == *user_name && room.now == 2 {
+                return true;
+            }
+            return false;
+        }
+    }
+    false
 }
 
 pub fn room_refresh(thread_index: usize, user_name: &String) -> String {
@@ -431,6 +494,19 @@ pub fn room_refresh(thread_index: usize, user_name: &String) -> String {
                 }
             }
             r.push(' ');
+            return r;
+        }
+    }
+    unreachable!();
+}
+
+pub fn room_pass(thread_index: usize, user_name: &mut String, card_index: usize) -> String {
+    let room_name = get_room_name_by_user(user_name);
+    for room in get_rooms().lock().unwrap().iter_mut() {
+        if room.name == room_name {
+            let r =  room.pass(thread_index, user_name, card_index);
+            room_refresh(thread_index, &room.belongs_to);
+            room_refresh(thread_index, &room.guest);
             return r;
         }
     }
