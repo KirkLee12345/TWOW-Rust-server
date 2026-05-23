@@ -509,3 +509,11 @@ pub fn room_pass(thread_index: usize, user_name: &mut String, card_index: usize)
     }
     unreachable!();
 }
+
+pub(crate) fn room_next(thread_index: usize, user_name: &mut String) -> String {
+    todo!()
+}
+
+pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: usize) -> String {
+    todo!()
+}
