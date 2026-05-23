@@ -304,7 +304,7 @@ impl Room {
         }
         unreachable!();
     }
-    pub fn nnext(&mut self) {
+    pub fn nnext(&mut self, thread_index: usize) {
         if self.now == 1 {
             self.now = 2;
             if self.player1.energy < 6 {
@@ -314,7 +314,16 @@ impl Room {
                 }
             }
             if !self.player1.used {
-                self.get_random_card_to_player1();
+                if !self.get_random_card_to_player1() {
+                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+                    get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
+                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+                    get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
+                    log(format!("房间 {} 平局", self.name));
+                    remove_room_by_room_name(&self.name, thread_index);
+                    remove_room_by_room_name(&self.name, thread_index);
+                    return;
+                }
             }
             self.player1.used = false;
             return
@@ -328,7 +337,16 @@ impl Room {
                 }
             }
             if !self.player2.used {
-                self.get_random_card_to_player2();
+                if !self.get_random_card_to_player2() {
+                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+                    get_client_by_user_name(&self.belongs_to).unwrap().write_all("game end p ".as_bytes()).unwrap();
+                    if IS_DEBUG { log(format!("[{thread_index}] 发送数据: game end p ")); }
+                    get_client_by_user_name(&self.guest).unwrap().write_all("game end p ".as_bytes()).unwrap();
+                    log(format!("房间 {} 平局", self.name));
+                    remove_room_by_room_name(&self.name, thread_index);
+                    remove_room_by_room_name(&self.name, thread_index);
+                    return;
+                }
             }
             self.player2.used = false;
             return
@@ -558,7 +576,7 @@ pub(crate) fn room_next(thread_index: usize, user_name: &mut String) {
     let room_name = get_room_name_by_user(user_name);
     for room in get_rooms().lock().unwrap().iter_mut() {
         if room.name == room_name {
-            room.nnext();
+            room.nnext(thread_index);
             player1_name = room.belongs_to.clone();
             player2_name = room.guest.clone();
             break;
