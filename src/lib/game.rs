@@ -356,8 +356,7 @@ pub fn handle_data(data: String, thread_index: usize, is_login: &mut bool, zh: &
                     if !room::is_user_now_in_room(zh) { return String::from("tip [E123]参数错误(不是该玩家的回合) ");}
                     let card_index = data[2].parse::<usize>().unwrap();
                     if card_index < 0 || card_index >= 8 { return String::from("tip [E124]参数错误(未知手牌) ");}
-                    room::room_use(thread_index, zh, card_index);
-                    return String::from("null");
+                    return room::room_use(thread_index, zh, card_index);
                 }
                 _ => return String::from("tip [E125]参数错误(无法解析的数据) ")
             }
