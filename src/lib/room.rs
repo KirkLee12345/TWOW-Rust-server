@@ -317,7 +317,7 @@ impl Room {
             Card::Shield(num) => {
                 if self.player[p].energy < num { return "tip [E132]参数错误(能量不足) ".to_string(); }
                 self.player[p].energy -= num;
-                if !self.defend() {
+                if !self.defend(thread_index, p, num, format!("log 你打出了一张{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}", self.player[p].hand_cards[card_index].to_string())) {
                     self.player[p].energy += num;
                     return "tip [E133]参数错误(盾牌槽已满) ".to_string();
                 }
@@ -379,8 +379,38 @@ impl Room {
         if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
         else { self.log(thread_index, &self.guest, text1, text2); }
     }
-    pub fn defend(&mut self) -> bool {
-        todo!()
+    pub fn defend(&mut self, thread_index: usize, p: usize, num: i32, mut text1: String, mut text2: String) -> bool {
+        let pp: usize = if p == 0 { 1 } else { 0 };
+        for i in 0..self.player[pp].passive_cards.len() {
+            match self.player[pp].passive_cards[i] {
+                Card::Shield(0) => {
+                    self.player[pp].passive_cards[i] = Card::Empty;
+                    text1.push_str("，但触发了对方的被动卡牌");
+                    text2.push_str("，触发了你的被动卡牌");
+                    if !self.defend(thread_index, pp, num, text2.clone(), text1.clone()) {
+                        text1.push_str("，但对方的护盾槽已满，自动反转回来");
+                        text2.push_str("，但你的护盾槽已满，自动反转回去");
+                        return self.defend(thread_index, p, num, text1, text2);
+                    }
+                    return true;
+                },
+                _ => (),
+            }
+        }
+        for i in 0..self.player[pp].out_cards.len() {
+            match self.player[pp].out_cards[i] {
+                Card::Empty => {
+                    self.player[pp].out_cards[i] = Card::Shield(num);
+                    text1.push(' ');
+                    text2.push(' ');
+                    if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
+                    else { self.log(thread_index, &self.guest, text1, text2); }
+                    return true;
+                },
+                _ => (),
+            }
+        }
+        false
     }
     pub fn damage(&mut self) {
         todo!()
