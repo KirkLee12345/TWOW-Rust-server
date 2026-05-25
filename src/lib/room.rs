@@ -179,14 +179,22 @@ impl Room {
         self.player[p].hand_cards[temp_index[idx]] = Card::Empty;
     }
     pub fn init_all_cards(&mut self) {
-        for _ in 0..4 {
-            for i in 0..=9 {
+        for _ in 0..2 {
+            for i in 0..=8 {
+                self.all_cards.push(Card::Attack(i));
+                self.all_cards.push(Card::Shield(i));
+                self.all_cards.push(Card::AddEnergy(i));
+                self.all_cards.push(Card::ConsumeEnergy(i));
+            }
+            for i in 0..=6 {
                 self.all_cards.push(Card::Attack(i));
                 self.all_cards.push(Card::Shield(i));
                 self.all_cards.push(Card::AddEnergy(i));
                 self.all_cards.push(Card::ConsumeEnergy(i));
             }
             self.all_cards.push(Card::Skill(2));
+            self.all_cards.push(Card::Skill(2));
+            self.all_cards.push(Card::Skill(4));
             self.all_cards.push(Card::Skill(4));
         }
     }
