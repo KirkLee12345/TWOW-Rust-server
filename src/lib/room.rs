@@ -540,6 +540,7 @@ pub fn is_user_now_in_room(user_name: &String) -> bool {
 
 pub fn room_refresh(thread_index: usize, user_name: &String) {
     let room_name = get_room_name_by_user(user_name);
+    let mut is_need_clear_room = false;
     for room in get_rooms().lock().unwrap().iter_mut() {
         if room.name == room_name {
             let mut r = "game nowinfo".to_string();
@@ -608,23 +609,23 @@ pub fn room_refresh(thread_index: usize, user_name: &String) {
                 if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end loss "));}
                 get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
                 log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
-                remove_room_by_room_name(&room_name, thread_index);
+                is_need_clear_room = true;
                 thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
             }
             if !room.panduan_player_is_can_continue(thread_index, pp) {
                 if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
                 get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
                 log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
-                remove_room_by_room_name(&room_name, thread_index);
+                is_need_clear_room = true;
                 thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
             }
             r.push(' ');
             if IS_DEBUG {log(format!("[{thread_index}] 发送数据: {r}"));}
             get_client_by_user_name(user_name).unwrap().write_all(r.as_bytes()).unwrap();
-            return;
+            if !is_need_clear_room { return; };
         }
     }
-    unreachable!();
+    remove_room_by_room_name(&room_name, thread_index);
 }
 
 pub fn room_pass(thread_index: usize, user_name: &mut String, card_index: usize) -> String {
