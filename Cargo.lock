@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "TWOW-server-rust"
+name = "TWOW-Rust-server"
 version = "1.2.3"
 dependencies = [
  "anyhow",
