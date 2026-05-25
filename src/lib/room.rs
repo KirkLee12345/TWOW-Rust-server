@@ -127,6 +127,20 @@ impl Card {
             Card::Skill(i) => "w".to_string() + &i.to_string(),
         }
     }
+    pub fn to_string(&self) -> String {
+        match self {
+            Card::Empty => "空卡牌".to_string(),
+            Card::Attack(0) => "攻击反转".to_string(),
+            Card::Shield(0) => "护盾反转".to_string(),
+            Card::AddEnergy(0) => "能量反转".to_string(),
+            Card::ConsumeEnergy(0) => "扣能反转".to_string(),
+            Card::Attack(i) => format!("攻击{i}牌"),
+            Card::Shield(i) => format!("护盾{i}牌"),
+            Card::AddEnergy(i) => format!("能量{i}牌"),
+            Card::ConsumeEnergy(i) => format!("扣能{i}牌"),
+            Card::Skill(i) => format!("回血{i}牌"),
+        }
+    }
 }
 
 impl Room {
@@ -240,7 +254,7 @@ impl Room {
                 Card::Empty => {
                     self.player[p].passive_cards[i] = self.player[p].hand_cards[card_index];
                     self.player[p].hand_cards[card_index] = Card::Empty;
-                    self.log(thread_index, user_name, "log 你放置了一张被动卡牌 ".to_string(), "log 对方放置了一张被动卡牌 ".to_string());
+                    self.log(thread_index, user_name, format!("log 你放置了一张被动卡牌{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方放置了一张被动卡牌{}", self.player[p].hand_cards[card_index].to_string()));
                     return "null".to_string();
                 },
                 _ => (),
@@ -277,27 +291,27 @@ impl Room {
         match self.player[p].hand_cards[card_index] {
             Card::Empty => return "tip [E128]参数错误(该手牌不存在) ".to_string(),
             Card::Skill(num) => {
+                self.log(thread_index, user_name, format!("log 你打出了一张{}，摸了{num}张牌 ", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}，摸了{num}张牌 ", self.player[p].hand_cards[card_index].to_string()));
                 self.player[p].hand_cards[card_index] = Card::Empty;
                 self.player[p].used = true;
                 self.last_card = Card::Skill(num);
                 for _ in 0..num {
                     self.get_random_card_to_player(p, thread_index);
                 }
-                self.log(thread_index, user_name, format!("log 你使用了一张回血牌，摸了{num}张牌 "), format!("log 对方使用了一张回血牌，摸了{num}张牌 "));
                 return "null".to_string();
             }
             Card::AddEnergy(num) => {
+                self.add_energy(thread_index, p, num, format!("log 你打出了一张{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}", self.player[p].hand_cards[card_index].to_string()));
                 self.player[p].hand_cards[card_index] = Card::Empty;
                 self.last_card = Card::AddEnergy(num);
                 self.player[p].used = true;
-                self.add_energy(thread_index, p, num, "log 你打出了一张能量卡牌".to_string(), "log 对方打出了一张能量卡牌".to_string());
                 return "null".to_string();
             }
             Card::ConsumeEnergy(num) => {
+                self.consume_energy(thread_index, p, num, format!("log 你打出了一张{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}", self.player[p].hand_cards[card_index].to_string()));
                 self.player[p].hand_cards[card_index] = Card::Empty;
                 self.last_card = Card::ConsumeEnergy(num);
                 self.player[p].used = true;
-                self.consume_energy(thread_index, p, num, "log 你打出了一张扣能卡牌".to_string(), "log 对方打出了一张扣能卡牌".to_string());
                 return "null".to_string();
             }
             Card::Shield(num) => {
