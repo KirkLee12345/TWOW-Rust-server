@@ -270,7 +270,7 @@ impl Room {
                 Card::Empty => {
                     self.player[p].passive_cards[i] = self.player[p].hand_cards[card_index];
                     self.player[p].hand_cards[card_index] = Card::Empty;
-                    self.log(thread_index, user_name, format!("log 你放置了一张被动卡牌{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方放置了一张被动卡牌{}", self.player[p].hand_cards[card_index].to_string()));
+                    self.log(thread_index, user_name, format!("log 你放置了一张被动卡牌{}", self.player[p].hand_cards[card_index].to_string()), "log 对方放置了一张被动卡牌".to_string());
                     return "null".to_string();
                 },
                 _ => (),
@@ -344,11 +344,11 @@ impl Room {
             }
             Card::Attack(num) => {
                 if self.player[p].energy < num { return "tip [E134]参数错误(能量不足) ".to_string(); }
+                self.damage(thread_index, p, num, format!("log 你打出了一张{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}", self.player[p].hand_cards[card_index].to_string()));
                 self.player[p].hand_cards[card_index] = Card::Empty;
                 self.last_card = Card::Attack(num);
                 self.player[p].energy -= num;
                 self.player[p].used = true;
-                self.damage(thread_index, p, num, format!("log 你打出了一张{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}", self.player[p].hand_cards[card_index].to_string()));
                 self.nnext(thread_index);
                 return "null".to_string();
             }
