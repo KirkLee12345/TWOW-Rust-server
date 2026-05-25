@@ -1,0 +1,9 @@
+# 兵者TWOW - Rust服务端
+
+这是回合制卡牌兵者的服务端源码。
+
+兵者的服务端已经使用Rust完全重构。
+
+客户端：[KirkLee12345/TWOW](https://github.com/KirkLee12345/TWOW)
+
+期待有大佬来指点，如需帮助，欢迎联系作者！
