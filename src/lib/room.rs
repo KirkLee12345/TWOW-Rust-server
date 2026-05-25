@@ -397,10 +397,10 @@ impl Room {
                 _ => (),
             }
         }
-        for i in 0..self.player[pp].out_cards.len() {
-            match self.player[pp].out_cards[i] {
+        for i in 0..self.player[p].out_cards.len() {
+            match self.player[p].out_cards[i] {
                 Card::Empty => {
-                    self.player[pp].out_cards[i] = Card::Shield(num);
+                    self.player[p].out_cards[i] = Card::Shield(num);
                     text1.push(' ');
                     text2.push(' ');
                     if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
