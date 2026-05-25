@@ -289,14 +289,14 @@ impl Room {
                 self.player[p].hand_cards[card_index] = Card::Empty;
                 self.last_card = Card::AddEnergy(num);
                 self.player[p].used = true;
-                self.add_energy();
+                self.add_energy(thread_index, p, num, "log 你打出了一张能量卡牌".to_string(), "log 对方打出了一张能量卡牌".to_string());
                 return "null".to_string();
             }
             Card::ConsumeEnergy(num) => {
                 self.player[p].hand_cards[card_index] = Card::Empty;
                 self.last_card = Card::ConsumeEnergy(num);
                 self.player[p].used = true;
-                self.consume_energy();
+                self.consume_energy(thread_index, p, num, "log 你打出了一张扣能卡牌".to_string(), "log 对方打出了一张扣能卡牌".to_string());
                 return "null".to_string();
             }
             Card::Shield(num) => {
@@ -323,6 +323,52 @@ impl Room {
             }
         }
         unreachable!()
+    }
+    pub fn add_energy(&mut self, thread_index: usize, p: usize, num: i32, mut text1: String, mut text2: String) {
+        let pp: usize = if p == 0 { 1 } else { 0 };
+        for i in 0..self.player[pp].passive_cards.len() {
+            match self.player[pp].passive_cards[i] {
+                Card::AddEnergy(0) => {
+                    self.player[pp].passive_cards[i] = Card::Empty;
+                    text1.push_str("，但触发了对方的被动卡牌");
+                    text2.push_str("，触发了你的被动卡牌");
+                    self.add_energy(thread_index, pp, num, text2, text1);
+                    return;
+                },
+                _ => (),
+            }
+        }
+        self.player[p].energy += num;
+        text1.push(' ');
+        text2.push(' ');
+        if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
+        else { self.log(thread_index, &self.guest, text1, text2); }
+    }
+    pub fn consume_energy(&mut self, thread_index: usize, p: usize, num: i32, mut text1: String, mut text2: String) {
+        let pp: usize = if p == 0 { 1 } else { 0 };
+        for i in 0..self.player[pp].passive_cards.len() {
+            match self.player[pp].passive_cards[i] {
+                Card::ConsumeEnergy(0) => {
+                    self.player[pp].passive_cards[i] = Card::Empty;
+                    text1.push_str("，但触发了对方的被动卡牌");
+                    text2.push_str("，触发了你的被动卡牌");
+                    self.consume_energy(thread_index, pp, num, text2, text1);
+                    return;
+                },
+                _ => (),
+            }
+        }
+        self.player[pp].energy -= num;
+        text1.push(' ');
+        text2.push(' ');
+        if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
+        else { self.log(thread_index, &self.guest, text1, text2); }
+    }
+    pub fn defend(&mut self) -> bool {
+        todo!()
+    }
+    pub fn damage(&mut self) {
+        todo!()
     }
 }
 
