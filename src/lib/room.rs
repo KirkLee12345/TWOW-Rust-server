@@ -231,6 +231,7 @@ impl Room {
             Card::Attack(0) => (),
             Card::ConsumeEnergy(0) => (),
             Card::Shield(0) => (),
+            Card::Skill(_) => (),
             Card::Empty => return "tip [E129]参数错误(该手牌不存在) ".to_string(),
             _ => return "tip [E130]参数错误(该手牌不能作为被动卡牌) ".to_string(),
         }
