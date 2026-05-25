@@ -134,11 +134,11 @@ impl Card {
             Card::Shield(0) => "护盾反转".to_string(),
             Card::AddEnergy(0) => "能量反转".to_string(),
             Card::ConsumeEnergy(0) => "扣能反转".to_string(),
-            Card::Attack(i) => format!("攻击{i}牌"),
-            Card::Shield(i) => format!("护盾{i}牌"),
-            Card::AddEnergy(i) => format!("能量{i}牌"),
-            Card::ConsumeEnergy(i) => format!("扣能{i}牌"),
-            Card::Skill(i) => format!("回血{i}牌"),
+            Card::Attack(i) => format!("{i}点攻击牌"),
+            Card::Shield(i) => format!("{i}点护盾牌"),
+            Card::AddEnergy(i) => format!("{i}点能量牌"),
+            Card::ConsumeEnergy(i) => format!("{i}点扣能牌"),
+            Card::Skill(i) => format!("{i}点回血牌"),
         }
     }
 }
