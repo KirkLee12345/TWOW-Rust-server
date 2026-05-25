@@ -250,13 +250,13 @@ impl Room {
         if self.is_belongs_to_user(user_name) {
             self.get_player1_client().unwrap().write_all(r1.as_bytes()).unwrap();
             self.get_player2_client().unwrap().write_all(r2.as_bytes()).unwrap();
-            log(format!("[{thread_index}] 向 {} 房间的房主玩家 {} 发送信息 {r1}", self.name, self.belongs_to));
-            log(format!("[{thread_index}] 向 {} 房间的访客玩家 {} 发送信息 {r2}", self.name, self.guest));
+            log(format!("[{thread_index}] 向 {} 房主 {} 发送信息 {r1}", self.name, self.belongs_to));
+            log(format!("[{thread_index}] 向 {} 访客 {} 发送信息 {r2}", self.name, self.guest));
         } else {
             self.get_player1_client().unwrap().write_all(r2.as_bytes()).unwrap();
             self.get_player2_client().unwrap().write_all(r1.as_bytes()).unwrap();
-            log(format!("[{thread_index}] 向 {} 房间的房主玩家 {} 发送信息 {r2}", self.name, self.belongs_to));
-            log(format!("[{thread_index}] 向 {} 房间的访客玩家 {} 发送信息 {r1}", self.name, self.guest));
+            log(format!("[{thread_index}] 向 {} 房主 {} 发送信息 {r2}", self.name, self.belongs_to));
+            log(format!("[{thread_index}] 向 {} 访客 {} 发送信息 {r1}", self.name, self.guest));
         }
         thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
     }
