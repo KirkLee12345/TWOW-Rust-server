@@ -6,7 +6,7 @@ use std::thread;
 use std::time::Duration;
 use rand::Rng;
 use crate::lib::game::get_client_by_user_name;
-use crate::lib::server::{log, IS_DEBUG, SLPPE_TIME_MILLIS};
+use crate::lib::server::{log, IS_DEBUG, SLEEP_TIME_MILLIS};
 
 
 pub(crate) static ROOMS: OnceLock<Mutex<Vec<Room>>> = OnceLock::new();
@@ -258,7 +258,7 @@ impl Room {
             log(format!("[{thread_index}] 向 {} 房主 {} 发送信息 {r2}", self.name, self.belongs_to));
             log(format!("[{thread_index}] 向 {} 访客 {} 发送信息 {r1}", self.name, self.guest));
         }
-        thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+        thread::sleep(Duration::from_millis(SLEEP_TIME_MILLIS));
     }
     pub fn pass(&mut self, thread_index: usize, user_name: &String, card_index: usize) -> String {
         let mut p: usize = 0;
@@ -618,14 +618,14 @@ pub fn room_refresh(thread_index: usize, user_name: &String) {
                 get_client_by_user_name(user_name).unwrap().write_all("game end loss ".as_bytes()).unwrap();
                 log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 输了"));
                 is_need_clear_room = true;
-                thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+                thread::sleep(Duration::from_millis(SLEEP_TIME_MILLIS));
             }
             if !room.panduan_player_is_can_continue(thread_index, pp) {
                 if IS_DEBUG {log(format!("[{thread_index}] 发送数据: game end win "));}
                 get_client_by_user_name(user_name).unwrap().write_all("game end win ".as_bytes()).unwrap();
                 log(format!("[{thread_index}] 房间 {room_name} 玩家 {user_name} 赢了"));
                 is_need_clear_room = true;
-                thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+                thread::sleep(Duration::from_millis(SLEEP_TIME_MILLIS));
             }
             r.push(' ');
             if IS_DEBUG {log(format!("[{thread_index}] 发送数据: {r}"));}
@@ -651,7 +651,7 @@ pub fn room_pass(thread_index: usize, user_name: &mut String, card_index: usize)
     }
     room_refresh(thread_index, &player1_name);
     room_refresh(thread_index, &player2_name);
-    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+    thread::sleep(Duration::from_millis(SLEEP_TIME_MILLIS));
     r
 }
 
@@ -671,7 +671,7 @@ pub(crate) fn room_next(thread_index: usize, user_name: &String) {
     room_refresh(thread_index, &player1_name);
     room_refresh(thread_index, &player2_name);
     if is_game_p {
-        thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+        thread::sleep(Duration::from_millis(SLEEP_TIME_MILLIS));
         remove_room_by_room_name(&room_name, thread_index);
         remove_room_by_room_name(&room_name, thread_index);
     }
@@ -689,6 +689,6 @@ pub(crate) fn room_use(thread_index: usize, user_name: &mut String, card_index: 
     }
     room_refresh(thread_index, &player1_name);
     room_refresh(thread_index, &player2_name);
-    thread::sleep(Duration::from_millis(SLPPE_TIME_MILLIS));
+    thread::sleep(Duration::from_millis(SLEEP_TIME_MILLIS));
     r
 }
