@@ -345,8 +345,8 @@ impl Room {
             match self.player[pp].passive_cards[i] {
                 Card::AddEnergy(0) => {
                     self.player[pp].passive_cards[i] = Card::Empty;
-                    text1.push_str("，但触发了对方的被动卡牌");
-                    text2.push_str("，触发了你的被动卡牌");
+                    text1.push_str(format!("，但触发了对方的被动卡牌{}", Card::AddEnergy(0).to_string()).as_str());
+                    text2.push_str(format!("，但触发了你的被动卡牌{}", Card::AddEnergy(0).to_string()).as_str());
                     self.add_energy(thread_index, pp, num, text2, text1);
                     return;
                 },
@@ -354,8 +354,8 @@ impl Room {
             }
         }
         self.player[p].energy += num;
-        text1.push(' ');
-        text2.push(' ');
+        text1.push_str("。 ");
+        text2.push_str("。 ");
         if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
         else { self.log(thread_index, &self.guest, text1, text2); }
     }
@@ -365,8 +365,8 @@ impl Room {
             match self.player[pp].passive_cards[i] {
                 Card::ConsumeEnergy(0) => {
                     self.player[pp].passive_cards[i] = Card::Empty;
-                    text1.push_str("，但触发了对方的被动卡牌");
-                    text2.push_str("，触发了你的被动卡牌");
+                    text1.push_str(format!("，但触发了对方的被动卡牌{}", Card::ConsumeEnergy(0).to_string()).as_str());
+                    text2.push_str(format!("，但触发了你的被动卡牌{}", Card::ConsumeEnergy(0).to_string()).as_str());
                     self.consume_energy(thread_index, pp, num, text2, text1);
                     return;
                 },
@@ -374,8 +374,8 @@ impl Room {
             }
         }
         self.player[pp].energy -= num;
-        text1.push(' ');
-        text2.push(' ');
+        text1.push_str("。 ");
+        text2.push_str("。 ");
         if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
         else { self.log(thread_index, &self.guest, text1, text2); }
     }
@@ -385,8 +385,8 @@ impl Room {
             match self.player[pp].passive_cards[i] {
                 Card::Shield(0) => {
                     self.player[pp].passive_cards[i] = Card::Empty;
-                    text1.push_str("，但触发了对方的被动卡牌");
-                    text2.push_str("，触发了你的被动卡牌");
+                    text1.push_str(format!("，但触发了对方的被动卡牌{}", Card::Shield(0).to_string()).as_str());
+                    text2.push_str(format!("，但触发了你的被动卡牌{}", Card::Shield(0).to_string()).as_str());
                     if !self.defend(thread_index, pp, num, text2.clone(), text1.clone()) {
                         text1.push_str("，但对方的护盾槽已满，自动反转回来");
                         text2.push_str("，但你的护盾槽已满，自动反转回去");
@@ -401,8 +401,8 @@ impl Room {
             match self.player[p].out_cards[i] {
                 Card::Empty => {
                     self.player[p].out_cards[i] = Card::Shield(num);
-                    text1.push(' ');
-                    text2.push(' ');
+                    text1.push_str("。 ");
+                    text2.push_str("。 ");
                     if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
                     else { self.log(thread_index, &self.guest, text1, text2); }
                     return true;
