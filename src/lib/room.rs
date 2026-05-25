@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
@@ -161,6 +162,21 @@ impl Room {
         };
         let idx = rand::thread_rng().gen_range(0..self.all_cards.len());
         *empty_slot = self.all_cards.swap_remove(idx);
+    }
+    pub fn remove_random_card_for_player(&mut self, p: usize, thread_index: usize) {
+        let mut temp_index: Vec<usize> = vec![];
+        for i in 0..self.player[p].hand_cards.len() {
+            match self.player[p].hand_cards[i] {
+                Card::Empty => continue,
+                _ => {
+                    temp_index.push(i);
+                    break;
+                }
+            }
+        }
+        if temp_index.len() == 0 { return; }
+        let idx = rand::thread_rng().gen_range(0..temp_index.len());
+        self.player[p].hand_cards[temp_index[idx]] = Card::Empty;
     }
     pub fn init_all_cards(&mut self) {
         for _ in 0..4 {
@@ -332,8 +348,8 @@ impl Room {
                 self.last_card = Card::Attack(num);
                 self.player[p].energy -= num;
                 self.player[p].used = true;
-                self.damage();
-                room_next(thread_index, &self.belongs_to);
+                self.damage(thread_index, p, num, format!("log 你打出了一张{}", self.player[p].hand_cards[card_index].to_string()), format!("log 对方打出了一张{}", self.player[p].hand_cards[card_index].to_string()));
+                self.nnext(thread_index);
                 return "null".to_string();
             }
         }
@@ -412,8 +428,61 @@ impl Room {
         }
         false
     }
-    pub fn damage(&mut self) {
-        todo!()
+    pub fn damage(&mut self, thread_index: usize, p: usize, mut num: i32, mut text1: String, mut text2: String) {
+        let pp: usize = if p == 0 { 1 } else { 0 };
+        for i in 0..self.player[pp].passive_cards.len() {
+            match self.player[pp].passive_cards[i] {
+                Card::Attack(0) => {
+                    self.player[pp].passive_cards[i] = Card::Empty;
+                    text1.push_str(format!("，但触发了对方的被动卡牌{}", Card::Attack(0).to_string()).as_str());
+                    text2.push_str(format!("，但触发了你的被动卡牌{}", Card::Attack(0).to_string()).as_str());
+                    self.damage(thread_index, pp, num, text2, text1);
+                    return;
+                },
+                _ => (),
+            }
+        }
+        for i in 0..self.player[pp].out_cards.len() {
+            match self.player[pp].out_cards[i] {
+                Card::Shield(1) => {
+                    self.player[pp].out_cards[i] = Card::Empty;
+                    text1.push_str(format!("，被对方的1点无敌护盾卡牌抵消了所有{num}点伤害").as_str());
+                    text2.push_str(format!("，被你的1点无敌护盾卡牌抵消了所有{num}点伤害").as_str());
+                    num = 0;
+                }
+                Card::Shield(snum) => {
+                    if num == snum {
+                        self.player[pp].out_cards[i] = Card::Empty;
+                        text1.push_str(format!("，被对方的{snum}点护盾卡牌刚好抵消了所有{num}点伤害").as_str());
+                        text2.push_str(format!("，被你的{snum}点护盾卡牌刚好抵消了所有{num}点伤害").as_str());
+                        num = 0;
+                    } else if num < snum {
+                        self.player[pp].out_cards[i] = Card::Shield(snum - num);
+                        text1.push_str(format!("，被对方的{snum}点护盾卡牌完全抵消了{num}点伤害").as_str());
+                        text2.push_str(format!("，被你的{snum}点护盾卡牌完全抵消了{num}点伤害").as_str());
+                        num = 0;
+                    } else {
+                        self.player[pp].out_cards[i] = Card::Empty;
+                        text1.push_str(format!("，被对方的{snum}点护盾卡牌抵消了部分伤害").as_str());
+                        text2.push_str(format!("，被你的{snum}点护盾卡牌抵消了部分伤害").as_str());
+                        num -= snum;
+                    }
+                }
+                _ => (),
+            }
+            if num == 0 { break; }
+        }
+        if num != 0 {
+            for _ in 0..num {
+                self.remove_random_card_for_player(pp, thread_index);
+            }
+            text1.push_str(format!("，对对方造成{num}点伤害").as_str());
+            text2.push_str(format!("，对你造成{num}点伤害").as_str());
+        }
+        text1.push_str("。 ");
+        text2.push_str("。 ");
+        if p == 0 { self.log(thread_index, &self.belongs_to, text1, text2); }
+        else { self.log(thread_index, &self.guest, text1, text2); }
     }
 }
 
